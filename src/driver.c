@@ -3949,6 +3949,7 @@ BOMULEUL CHAJARA SEGA ST-V  1997/04/11
 	DRIVER( puzldama )	/* GX315 (c) 1994 (Japan) */
 	DRIVER( gokuparo )	/* GX321 (c) 1994 (Japan) */
 	DRIVER( fantjour )	/* GX321 */
+	DRIVER( dragoona )
 	DRIVER( dragoonj )	/* GX417 (c) 1995 (Japan) */
 	DRIVER( tbyahhoo )	/* GX424 (c) 1995 (Japan) */
 	DRIVER( tkmmpzdm )	/* GX515 (c) 1995 (Japan) */
@@ -4121,6 +4122,7 @@ BOMULEUL CHAJARA SEGA ST-V  1997/04/11
 	DRIVER( centipb2 )	/* (bootleg) */
 	DRIVER( millpac )	/* Valadon */
 	DRIVER( magworm )	/* (bootleg) */
+	DRIVER( mazeinv )	/* (proto)			(c) 1981 */
 	DRIVER( milliped )	/* 136013			(c) 1982 */
 	DRIVER( qwak )	 	/* (proto)			(c) 1982 */
 	DRIVER( runaway )	/* (proto)          (c) 1982 */
@@ -5597,7 +5599,10 @@ Other Sun games
 	DRIVER( kov115 )	/* (c) 1999 */
 	DRIVER( kovsh )		/* (c) 1999 */
 	DRIVER( photoy2k )	/* (c) 1999 */
-	DRIVER( puzlstar )      /* (c) 1999 */
+	DRIVER( puzlstar )  /* (c) 1999 */
+  DRIVER( puzzli2 )   /* (c) 1999 */
+  DRIVER( puzzli2s )  /* (c) 2001 */
+  DRIVER( py2k2 )     /* (c) 2001 */
 
 	/* RamTek games */
 	DRIVER( hitme )		/* [1976 Ramtek] */
