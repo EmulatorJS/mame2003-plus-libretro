@@ -301,6 +301,18 @@ static READ_HANDLER( dkong_in2_r )
 	return input_port_2_r(offset) | (mcustatus << 6);
 }
 
+static int bitty=0;
+
+static READ_HANDLER( dkremix_in2_r )
+{
+	if (bitty ==3 ) 
+	{
+		bitty++;
+		return 0x80;
+	}
+	bitty++;
+	return input_port_2_r(offset) | (mcustatus << 6);
+}
 
 static MEMORY_READ_START( readmem )
 	{ 0x0000, 0x5fff, MRA_ROM },	/* DK: 0000-3fff */
@@ -325,8 +337,18 @@ static MEMORY_READ_START( dkong2_readmem )
 	{ 0x7d80, 0x7d80, input_port_3_r },	/* DSW1 */
 	{ 0x8000, 0xffff, MRA_BANK2 },	/* DK3 and bootleg DKjr only */
 	{ 0xc800, 0xc800, braze_eeprom_r },
+MEMORY_END
 
-
+static MEMORY_READ_START( dkremix_readmem )
+	{ 0x0000, 0x5fff, MRA_BANK1 },	/* DK: 0000-3fff */
+	{ 0x6000, 0x6fff, MRA_RAM },	/* including sprites RAM */
+	{ 0x7400, 0x77ff, MRA_RAM },	/* video RAM */
+	{ 0x7c00, 0x7c00, input_port_0_r },	/* IN0 */
+	{ 0x7c80, 0x7c80, input_port_1_r },	/* IN1 */
+	{ 0x7d00, 0x7d00, dkremix_in2_r },	/* IN2/DSW2 */
+	{ 0x7d80, 0x7d80, input_port_3_r },	/* DSW1 */
+	{ 0x8000, 0xffff, MRA_BANK2 },	/* DK3 and bootleg DKjr only */
+	{ 0xc800, 0xc800, braze_eeprom_r },
 MEMORY_END
 
 static MEMORY_READ_START( dkong3_readmem )
@@ -1734,6 +1756,40 @@ static MACHINE_DRIVER_START( braze )
 	MDRV_SOUND_ADD(SAMPLES, dkong_samples_interface)
 MACHINE_DRIVER_END
 
+static MACHINE_DRIVER_START( dkremix )
+
+	/* basic machine hardware */
+	MDRV_CPU_ADD(Z80, 3072000)	/* 3.072 MHz (?) */
+	MDRV_CPU_MEMORY(dkremix_readmem,dkong2_writemem)
+	MDRV_CPU_VBLANK_INT(nmi_line_pulse,1)
+
+	MDRV_CPU_ADD(I8035,6000000/15)
+	MDRV_CPU_FLAGS(CPU_AUDIO_CPU)	/* 6MHz crystal */
+	MDRV_CPU_MEMORY(readmem_sound,writemem_sound)
+	MDRV_CPU_PORTS(readport_sound,writeport_sound)
+
+	MDRV_NVRAM_HANDLER(braze)
+
+	MDRV_FRAMES_PER_SECOND(60)
+	MDRV_VBLANK_DURATION(DEFAULT_60HZ_VBLANK_DURATION)
+
+	/* video hardware */
+	MDRV_VIDEO_ATTRIBUTES(VIDEO_TYPE_RASTER)
+	MDRV_SCREEN_SIZE(OLD_HTOTAL, OLD_VTOTAL)
+	MDRV_VISIBLE_AREA(OLD_HBEND, OLD_HBSTART-1, OLD_VBEND, OLD_VBSTART -1)
+	MDRV_GFXDECODE(gfxdecodeinfo)
+	MDRV_PALETTE_LENGTH(DK2B_PALETTE_LENGTH)
+	MDRV_COLORTABLE_LENGTH(DK2B_PALETTE_LENGTH)
+
+	MDRV_PALETTE_INIT(dkong)
+	MDRV_VIDEO_START(dkong)
+	MDRV_VIDEO_UPDATE(dkong)
+
+	/* sound hardware */
+	MDRV_SOUND_ADD(DAC, dkong_dac_interface)
+	MDRV_SOUND_ADD(SAMPLES, dkong_samples_interface)
+MACHINE_DRIVER_END
+
 static INTERRUPT_GEN( hunchbkd_interrupt )
 {
 	cpu_set_irq_line_and_vector(0, 0, HOLD_LINE, 0x03);
@@ -3106,5 +3162,5 @@ GAMEX(1985, strtheat,  0,        strtheat, strtheat, 0,        ROT270, "Epos Cor
 
 /* Braze Technologies bootleg hardware */
 GAME (2008, dkongx,    dkong,    braze,    dkongx,   dkongx,   ROT270, "bootleg",  "Donkey Kong II - Jumpman Returns (Hack V1.2)" )
-GAME (2015, dkremix,   dkong,    braze,    dkongx,   dkongx,   ROT270, "bootleg",  "Donkey Kong Remix" )
+GAME (2015, dkremix,   dkong,    dkremix,  dkongx,   dkongx,   ROT270, "bootleg",  "Donkey Kong Remix" )
 GAME( 2017, dkchrmx,   dkong,    braze,    dkongx,   dkongx,   ROT270, "John Kowalski", "Donkey Kong Christmas Remix" )
