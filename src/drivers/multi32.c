@@ -19,51 +19,15 @@
 #include "vidhrdw/generic.h"
 #include "machine/eeprom.h"
 #include "machine/random.h"
+#include "includes/segas32.h"
 
 #define MASTER_CLOCK		32215900
 #define MULTI32_CLOCK		40000000
 
-#define MAX_COLOURS (16384)
-
-int multi32;
 
 static unsigned char irq_status;
-static data16_t *system32_shared_ram;
-extern data16_t *system32_mixerregs[2];  /* mixer registers*/
-
-static data16_t *sys32_protram;
-static data16_t *system32_workram;
-extern data16_t sys32_tilebank_external;
-extern data16_t sys32_displayenable;
-
-/* Video Hardware */
-extern int system32_temp_kludge;
-extern data16_t *sys32_spriteram16;
-extern data16_t *sys32_txtilemap_ram;
-extern data16_t *sys32_ramtile_ram;
-extern data16_t *scrambled_paletteram16[2];
-static data16_t *paletteram16_b;
-
-extern int system32_mixerShift;
-extern int system32_screen_mode;
-extern int system32_screen_old_mode;
-extern int system32_allow_high_resolution;
-
-extern int sys32_brightness[2][3];
-
-WRITE16_HANDLER( sys32_videoram_w );
-WRITE16_HANDLER( sys32_ramtile_w );
-WRITE16_HANDLER( sys32_spriteram_w );
-READ16_HANDLER ( sys32_videoram_r );
-WRITE32_HANDLER( sys32_videoram_long_w );
-READ32_HANDLER ( sys32_videoram_long_r );
-VIDEO_START( system32 );
-VIDEO_UPDATE( system32 );
-
-extern int system32_use_default_eeprom;
-
-static data16_t controlB[256];
-static data16_t control[256];
+static data8_t *z80_shared_ram;
+static UINT8 sound_dummy_value;
 
 static void irq_raise(int level)
 {
@@ -109,154 +73,6 @@ static NVRAM_HANDLER( system32 )
 	}
 }
 
-static READ16_HANDLER(system32_eeprom_r)
-{
-	return (EEPROM_read_bit() << 7) | input_port_0_r(0);
-}
-
-static WRITE16_HANDLER(system32_eeprom_w)
-{
-	if(ACCESSING_LSB) {
-		EEPROM_write_bit(data & 0x80);
-		EEPROM_set_cs_line((data & 0x20) ? CLEAR_LINE : ASSERT_LINE);
-		EEPROM_set_clock_line((data & 0x40) ? ASSERT_LINE : CLEAR_LINE);
-	}
-}
-
-
-static READ16_HANDLER(sys32_read_ff)
-{
-	return 0xffff;
-}
-
-static READ16_HANDLER(sys32_read_random)
-{
-	return mame_rand(); /* new random.c random number code, see clouds in ga2*/
-}
-
-extern int sys32_brightness[2][3];
-
-void multi32_set_colour (int offset, int monitor)
-{
-	int data;
-	int r,g,b;
-	int r2,g2,b2;
-	UINT16 r_bright, g_bright, b_bright;
-
-	/* Although the hardware writes to all 65536 colours on both monitors, the
-	   games do not use more than 16384 colours per monitor.  We discard any
-	   colours that are written above MAX_COLOURS(16384).
-	*/
-
-	if (offset<MAX_COLOURS) {
-		if (monitor) {
-			data = paletteram16_b[offset];
-		}
-		else data = paletteram16[offset];
-
-		r = (data >> 0) & 0x0f;
-		g = (data >> 4) & 0x0f;
-		b = (data >> 8) & 0x0f;
-
-		r2 = (data >> 13) & 0x1;
-		g2 = (data >> 13) & 0x1;
-		b2 = (data >> 13) & 0x1;
-
-		r = (r << 4) | (r2 << 3);
-		g = (g << 4) | (g2 << 3);
-		b = (b << 4) | (b2 << 3);
-
-		/* there might be better ways of doing this ... but for now its functional ;-)*/
-		r_bright = sys32_brightness[monitor][0]; r_bright &= 0x3f;
-		g_bright = sys32_brightness[monitor][1]; g_bright &= 0x3f;
-		b_bright = sys32_brightness[monitor][2]; b_bright &= 0x3f;
-
-		if ((r_bright & 0x20)) { r = (r * (r_bright&0x1f))>>5; } else { r = r+(((0xf8-r) * (r_bright&0x1f))>>5); }
-		if ((g_bright & 0x20)) { g = (g * (g_bright&0x1f))>>5; } else { g = g+(((0xf8-g) * (g_bright&0x1f))>>5); }
-		if ((b_bright & 0x20)) { b = (b * (b_bright&0x1f))>>5; } else { b = b+(((0xf8-b) * (b_bright&0x1f))>>5); }
-
-		palette_set_color((monitor*MAX_COLOURS)+offset,r,g,b);
-	}
-}
-
-static WRITE16_HANDLER( multi32_paletteram16_xBBBBBGGGGGRRRRR_scrambled_word_w )
-{
-	int r,g,b;
-	int r2,g2,b2;
-
-	if (offset<MAX_COLOURS) {
-		COMBINE_DATA(&scrambled_paletteram16[0][offset]); /* it expects to read back the same values?*/
-
-		/* rearrange the data to normal format ... */
-
-		r = (data >>1) & 0xf;
-		g = (data >>6) & 0xf;
-		b = (data >>11) & 0xf;
-
-		r2 = (data >>0) & 0x1;
-		g2 = (data >>5) & 0x1;
-		b2 = (data >> 10) & 0x1;
-
-		data = (data & 0x8000) | r | g<<4 | b << 8 | r2 << 12 | g2 << 13 | b2 << 14;
-
-		COMBINE_DATA(&paletteram16[offset]);
-
-		multi32_set_colour(offset, 0);
-	}
-}
-
-static WRITE16_HANDLER( multi32_paletteram16_xBGRBBBBGGGGRRRR_word_w )
-{
-	if (offset<MAX_COLOURS) {
-		COMBINE_DATA(&paletteram16[offset]);
-
-	/* some games use 8-bit writes to some palette regions*/
-	/* (especially for the text layer palettes)*/
-
-		multi32_set_colour(offset, 0);
-	}
-}
-
-/* --------------------------------------- Monitor B ---------------------------------*/
-
-static WRITE16_HANDLER( multi32_paletteram16_xBBBBBGGGGGRRRRR_scrambled_word_b_w )
-{
-	int r,g,b;
-	int r2,g2,b2;
-
-	if (offset<MAX_COLOURS) {
-		COMBINE_DATA(&scrambled_paletteram16[1][offset]); /* it expects to read back the same values?*/
-
-		/* rearrange the data to normal format ... */
-
-		r = (data >>1) & 0xf;
-		g = (data >>6) & 0xf;
-		b = (data >>11) & 0xf;
-
-		r2 = (data >>0) & 0x1;
-		g2 = (data >>5) & 0x1;
-		b2 = (data >> 10) & 0x1;
-
-		data = (data & 0x8000) | r | g<<4 | b << 8 | r2 << 12 | g2 << 13 | b2 << 14;
-
-
-		COMBINE_DATA(&paletteram16_b[offset]);
-
-		multi32_set_colour(offset, 1);
-	}
-}
-
-static WRITE16_HANDLER( multi32_paletteram16_xBGRBBBBGGGGRRRR_word_b_w )
-{
-	if (offset<MAX_COLOURS) {
-		COMBINE_DATA(&paletteram16_b[offset]);
-
-		/* some games use 8-bit writes to some palette regions*/
-		/* (especially for the text layer palettes)*/
-
-		multi32_set_colour(offset, 1);
-	}
-}
 
 extern int analogRead[8];
 extern int analogSwitch;
@@ -287,8 +103,6 @@ static READ16_HANDLER( multi32_io_analog_r )
 
 static WRITE16_HANDLER( multi32_io_analog_w )
 {
-	COMBINE_DATA(&control[offset]);
-
 	if (offset<=3) {
 		if (analogSwitch) analogRead[offset*2+1]=readinputport(offset*2+5);
 		else analogRead[offset*2]=readinputport(offset*2+4);
@@ -324,7 +138,7 @@ static READ16_HANDLER( multi32_io_r )
 		return 0xffff;
 	case 0x07:
 		/* scross*/
-		return sys32_tilebank_external;
+		return system32_tilebank_external;
 	case 0x0e:
 		/* f1lap*/
 		return 0xffff;
@@ -341,12 +155,10 @@ static WRITE16_HANDLER( multi32_io_w )
 	{ 0xc00006, 0xc00007, system32_eeprom_w },
 	{ 0xc0000c, 0xc0000d, jp_v60_write_cab },
 	{ 0xc00008, 0xc0000d, MWA16_RAM }, // Unknown c00008=f1lap , c0000c=titlef
-	{ 0xc0000e, 0xc0000f, MWA16_RAM, &sys32_tilebank_external }, // tilebank per layer on multi32
-	{ 0xc0001c, 0xc0001d, MWA16_RAM, &sys32_displayenable },
+	{ 0xc0000e, 0xc0000f, MWA16_RAM, &system32_tilebank_external }, // tilebank per layer on multi32
+	{ 0xc0001c, 0xc0001d, MWA16_RAM, &system32_displayenable[0] },
 	{ 0xc0001e, 0xc0001f, MWA16_RAM }, // Unknown
 */
-
-	COMBINE_DATA(&control[offset]);
 
 	switch(offset) {
 	case 0x03:
@@ -364,10 +176,10 @@ static WRITE16_HANDLER( multi32_io_w )
 		break;
 	case 0x07:
 		/* Multi32: tilebank per layer*/
-		COMBINE_DATA(&sys32_tilebank_external);
+		COMBINE_DATA(&system32_tilebank_external);
 		break;
 	case 0x0e:
-		COMBINE_DATA(&sys32_displayenable);
+		COMBINE_DATA(&system32_displayenable[0]);
 		break;
 	case 0x0f:
 		/* orunners unknown*/
@@ -456,7 +268,6 @@ static READ16_HANDLER( multi32_io_B_r )
 
 static WRITE16_HANDLER( multi32_io_B_w )
 {
-	COMBINE_DATA(&controlB[offset]);
 	switch(offset) {
 
 	case 0x03:
@@ -473,7 +284,7 @@ static WRITE16_HANDLER( multi32_io_B_w )
 		}
 		break;
 	case 0x0e:
-		/* orunners value=86 (displayenable?)*/
+		COMBINE_DATA(&system32_displayenable[1]);
 		break;
 	case 0x0f:
 		/* orunners value=c8*/
@@ -495,89 +306,77 @@ static READ16_HANDLER( random_number_16_r )
        return rand();
 }
 
+static READ16_HANDLER( shared_ram_16_r )
+{
+	return z80_shared_ram[offset*2+0] | (z80_shared_ram[offset*2+1] << 8);
+}
+
+
+static WRITE16_HANDLER( shared_ram_16_w )
+{
+	if (ACCESSING_LSB)
+		z80_shared_ram[offset*2+0] = data;
+	if (ACCESSING_MSB)
+		z80_shared_ram[offset*2+1] = data >> 8;
+}
+
+
 static MEMORY_READ16_START( multi32_readmem )
 	{ 0x000000, 0x1fffff, MRA16_ROM },
-	{ 0x200000, 0x23ffff, MRA16_RAM }, /* work RAM*/
-	{ 0x300000, 0x31ffff, sys32_videoram_r }, /* Tile Ram*/
-	{ 0x400000, 0x41ffff, MRA16_RAM }, /* sprite RAM*/
-	{ 0x500000, 0x50000d, MRA16_RAM },	/* Unknown*/
-/*	{ 0x500002, 0x500003, jp_v60_read_cab },*/
-
-	{ 0x600000, 0x6100ff, MRA16_RAM }, /* Palette + mixer registers (Monitor A)*/
-	{ 0x680000, 0x69004f, MRA16_RAM }, /* Palette + mixer registers (Monitor B)*/
-
-	{ 0x700000, 0x701fff, MRA16_RAM },	/* shared RAM*/
-	{ 0x800000, 0x80000f, MRA16_RAM },	/* Unknown*/
-	{ 0x80007e, 0x80007f, MRA16_RAM },	/* Unknown f1lap*/
-	{ 0x801000, 0x801003, MRA16_RAM },	/* Unknown*/
-	{ 0xa00000, 0xa00001, MRA16_RAM }, /* Unknown dbzvrvs*/
-
+	{ 0x200000, 0x21ffff, MRA16_RAM }, /* work RAM*/
+	{ 0x300000, 0x31ffff, system32_videoram_r },
+	{ 0x400000, 0x41ffff, system32_spriteram_r },
+	{ 0x500000, 0x50000f, system32_sprite_control_r },
+	{ 0x600000, 0x60ffff, multi32_paletteram_0_r },
+	{ 0x610000, 0x61007f, multi32_mixer_0_r },
+	{ 0x680000, 0x68ffff, multi32_paletteram_1_r },
+	{ 0x690000, 0x69007f, multi32_mixer_1_r },
+	{ 0x700000, 0x701fff, shared_ram_16_r },	/* Shared ram with the z80*/
 	{ 0xc00000, 0xc0003f, multi32_io_r },
 	{ 0xc00050, 0xc0005f, multi32_io_analog_r },
 	{ 0xc00060, 0xc0007f, multi32_io_2_r },
 	{ 0xc80000, 0xc8007f, multi32_io_B_r },
-
 	{ 0xd80000, 0xdfffff, random_number_16_r },
-	{ 0xe00000, 0xe0000f, MRA16_RAM },   /* Unknown*/
-	{ 0xe80000, 0xe80003, MRA16_RAM }, /* Unknown*/
 	{ 0xf00000, 0xffffff, MRA16_BANK1 }, /* High rom mirror*/
 MEMORY_END
 
 static MEMORY_WRITE16_START( multi32_writemem )
 	{ 0x000000, 0x1fffff, MWA16_ROM },
-	{ 0x200000, 0x23ffff, MWA16_RAM, &system32_workram },
-	{ 0x300000, 0x31ffff, sys32_videoram_w },
-	{ 0x400000, 0x41ffff, sys32_spriteram_w, &sys32_spriteram16 }, /* Sprites*/
-	{ 0x500000, 0x50000d, MWA16_RAM },	/* Unknown*/
-
-	{ 0x600000, 0x607fff, multi32_paletteram16_xBBBBBGGGGGRRRRR_scrambled_word_w, &scrambled_paletteram16[0] },	/* magic data-line-scrambled mirror of palette RAM * we need to shuffle data written then?*/
-	{ 0x608000, 0x60ffff, multi32_paletteram16_xBGRBBBBGGGGRRRR_word_w, &paletteram16 }, /* Palettes*/
-	{ 0x610000, 0x6100ff, MWA16_RAM, &system32_mixerregs[0] }, /* mixer chip registers*/
-
-	{ 0x680000, 0x687fff, multi32_paletteram16_xBBBBBGGGGGRRRRR_scrambled_word_b_w, &scrambled_paletteram16[1] },	/* magic data-line-scrambled mirror of palette RAM * we need to shuffle data written then?*/
-	{ 0x688000, 0x68ffff, multi32_paletteram16_xBGRBBBBGGGGRRRR_word_b_w, &paletteram16_b }, /* Monitor B palette*/
-	{ 0x690000, 0x69004f, MWA16_RAM, &system32_mixerregs[1] }, /* monitor B mixer registers*/
-
-	{ 0x700000, 0x701fff, MWA16_RAM, &system32_shared_ram }, /* Shared ram with the z80*/
-	{ 0x800000, 0x80000f, MWA16_RAM },	/* Unknown*/
-	{ 0x80007e, 0x80007f, MWA16_RAM },	/* Unknown f1lap*/
-	{ 0x801000, 0x801003, MWA16_RAM },	/* Unknown*/
-	{ 0x81002a, 0x81002b, MWA16_RAM },	/* Unknown dbzvrvs*/
-	{ 0x810100, 0x810101, MWA16_RAM },	/* Unknown dbzvrvs*/
-	{ 0xa00000, 0xa00fff, MWA16_RAM, &sys32_protram },	/* protection RAM*/
-
+	{ 0x200000, 0x21ffff, MWA16_RAM }, /* work RAM */
+	{ 0x300000, 0x31ffff, system32_videoram_w, &system32_videoram },
+	{ 0x400000, 0x41ffff, system32_spriteram_w, &system32_spriteram },
+	{ 0x500000, 0x50000f, system32_sprite_control_w },
+	{ 0x600000, 0x60ffff, multi32_paletteram_0_w, &system32_paletteram[0] },
+	{ 0x610000, 0x61007f, multi32_mixer_0_w },
+	{ 0x680000, 0x68ffff, multi32_paletteram_1_w, &system32_paletteram[1] },
+	{ 0x690000, 0x69007f, multi32_mixer_1_w },
+	{ 0x700000, 0x701fff, shared_ram_16_w }, /* Shared ram with the z80*/
 	{ 0xc00000, 0xc0003f, multi32_io_w },
 	{ 0xc00050, 0xc0005f, multi32_io_analog_w },
 	{ 0xc00060, 0xc0007f, multi32_io_2_w },
 	{ 0xc80000, 0xc8007f, multi32_io_B_w },
-
-	{ 0xd00000, 0xd00005, MWA16_RAM }, /* Unknown*/
 	{ 0xd00006, 0xd00007, irq_ack_w },
-	{ 0xd00008, 0xd0000b, MWA16_RAM }, /* Unknown*/
 	{ 0xd80000, 0xdfffff, random_number_16_w },
-	{ 0xe00000, 0xe0000f, MWA16_RAM },   /* Unknown*/
-	{ 0xe80000, 0xe80003, MWA16_RAM }, /* Unknown*/
 	{ 0xf00000, 0xffffff, MWA16_ROM },
 MEMORY_END
 
 
-static MACHINE_INIT( system32 )
+static MACHINE_INIT( segas32 )
 {
 	cpu_setbank(1, memory_region(REGION_CPU1));
 	irq_init();
-
-	/* force it to select lo-resolution on reset */
-	system32_allow_high_resolution = 0;
-	system32_screen_mode = 0;
-	system32_screen_old_mode = 1;
 }
 
 static INTERRUPT_GEN( system32_interrupt )
 {
-	if(cpu_getiloops())
+	if(cpu_getiloops()) {
 		irq_raise(1);
-	else
+		system32_set_vblank(1);
+	}
+	else {
 		irq_raise(0);
+		system32_set_vblank(0);
+  }
 }
 
 static void irq_handler(int irq)
@@ -585,34 +384,21 @@ static void irq_handler(int irq)
 	cpu_set_irq_line( 1, 0 , irq ? ASSERT_LINE : CLEAR_LINE );
 }
 
-static struct GfxLayout s32_bgcharlayout =
+static struct GfxLayout bgcharlayout =
 {
 	16,16,
 	RGN_FRAC(1,1),
 	4,
 	{ 0,1,2,3 },
-	{ 0, 4, 16, 20, 8, 12, 24, 28,
-	   32, 36, 48, 52, 40, 44, 56, 60  },
+	{ 0, 4, 16, 20, 8, 12, 24, 28, 32, 36, 48, 52, 40, 44, 56, 60  },
 	{ 0*64, 1*64, 2*64, 3*64, 4*64, 5*64, 6*64, 7*64,
 	  8*64, 9*64,10*64,11*64,12*64,13*64,14*64,15*64 },
 	16*64
 };
 
-static struct GfxLayout s32_fgcharlayout =
-{
-	8,8,
-	RGN_FRAC(1,1),
-	4,
-	{ 0,1,2,3 },
-	{ 0, 4, 8, 12, 16, 20, 24, 28 },
-	{ 0*32, 1*32, 2*32, 3*32, 4*32, 5*32, 6*32, 7*32 },
-	16*16
-};
-
 static struct GfxDecodeInfo gfxdecodeinfo[] =
 {
-	{ REGION_GFX1, 0, &s32_bgcharlayout,   0x00, 0x3ff  },
-	{ REGION_GFX3, 0, &s32_fgcharlayout,   0x00, 0x3ff  },
+	{ REGION_GFX1, 0, &bgcharlayout,   0x00, 0x3ff  },
 	{ -1 } /* end of array */
 };
 
@@ -623,31 +409,40 @@ static READ_HANDLER( system32_bank_r )
 	return sys32_SoundMemBank[offset];
 }
 
-static READ_HANDLER( sys32_shared_snd_r )
+static READ_HANDLER( z80_shared_ram_r )
 {
-	data8_t *RAM = (data8_t *)system32_shared_ram;
-
-	return RAM[offset];
+	return z80_shared_ram[offset];
 }
 
-static WRITE_HANDLER( sys32_shared_snd_w )
-{
-	data8_t *RAM = (data8_t *)system32_shared_ram;
 
-	RAM[offset] = data;
+/*************************************
+ *
+ *  Sound hack (not protection)
+ *
+ *************************************/
+
+static READ_HANDLER( sound_dummy_r )
+{
+	return sound_dummy_value;
 }
 
-static MEMORY_READ_START( multi32_sound_readmem )
+
+static WRITE_HANDLER( sound_dummy_w )
+{
+	sound_dummy_value = data;
+}
+
+static MEMORY_READ_START( multi32_sound_map_r )
 	{ 0x0000, 0x9fff, MRA_ROM },
 	{ 0xa000, 0xbfff, system32_bank_r },
 	{ 0xc000, 0xdfff, MultiPCM_reg_0_r },
-	{ 0xe000, 0xffff, sys32_shared_snd_r },
+	{ 0xe000, 0xffff, z80_shared_ram_r },
 MEMORY_END
 
-static MEMORY_WRITE_START( multi32_sound_writemem )
+static MEMORY_WRITE_START( multi32_sound_map_w )
 	{ 0x0000, 0x9fff, MWA_ROM },
 	{ 0xc000, 0xdfff, MultiPCM_reg_0_w },
-	{ 0xe000, 0xffff, sys32_shared_snd_w },
+	{ 0xe000, 0xffff, MWA_RAM, &z80_shared_ram },
 MEMORY_END
 
 static WRITE_HANDLER( sys32_soundbank_w )
@@ -660,11 +455,12 @@ static WRITE_HANDLER( sys32_soundbank_w )
 	sys32_SoundMemBank = &RAM[Bank+0x10000];
 }
 
-static PORT_READ_START( multi32_sound_readport )
+static PORT_READ_START( multi32_sound_portmap_r )
 	{ 0x80, 0x80, YM2612_status_port_0_A_r },
+	{ 0xf1, 0xf1, sound_dummy_r },
 PORT_END
 
-static PORT_WRITE_START( multi32_sound_writeport )
+static PORT_WRITE_START( multi32_sound_portmap_w )
 	{ 0x80, 0x80, YM2612_control_port_0_A_w },
 	{ 0x81, 0x81, YM2612_data_port_0_A_w },
 	{ 0x82, 0x82, YM2612_control_port_0_B_w },
@@ -672,6 +468,7 @@ static PORT_WRITE_START( multi32_sound_writeport )
 	{ 0xa0, 0xa0, sys32_soundbank_w },
 	{ 0xb0, 0xb0, MultiPCM_bank_0_w },
 	{ 0xc1, 0xc1, IOWP_NOP },
+	{ 0xf1, 0xf1, sound_dummy_w },
 PORT_END
 
 struct YM2612interface mul32_ym3438_interface =
@@ -711,13 +508,13 @@ static MACHINE_DRIVER_START( base )
 	MDRV_CPU_VBLANK_INT(system32_interrupt,2)
 
 	MDRV_CPU_ADD(Z80, MASTER_CLOCK/4)
-	MDRV_CPU_MEMORY(multi32_sound_readmem, multi32_sound_writemem)
-	MDRV_CPU_PORTS(multi32_sound_readport, multi32_sound_writeport)
+	MDRV_CPU_MEMORY(multi32_sound_map_r, multi32_sound_map_w)
+	MDRV_CPU_PORTS(multi32_sound_portmap_r, multi32_sound_portmap_w)
 
 	MDRV_FRAMES_PER_SECOND(60)
 	MDRV_VBLANK_DURATION(100 /*DEFAULT_60HZ_VBLANK_DURATION*/)
 
-	MDRV_MACHINE_INIT(system32)
+	MDRV_MACHINE_INIT(segas32)
 	MDRV_NVRAM_HANDLER(system32)
 
 	/* video hardware */
@@ -728,8 +525,8 @@ static MACHINE_DRIVER_START( base )
 	MDRV_GFXDECODE(gfxdecodeinfo)
 	MDRV_PALETTE_LENGTH(32768)
 
-	MDRV_VIDEO_START(system32)
-	MDRV_VIDEO_UPDATE(system32)
+	MDRV_VIDEO_START(multi32)
+	MDRV_VIDEO_UPDATE(multi32)
 
 	MDRV_SOUND_ATTRIBUTES(SOUND_SUPPORTS_STEREO)
 	MDRV_SOUND_ADD(YM3438, mul32_ym3438_interface)
@@ -744,27 +541,6 @@ static MACHINE_DRIVER_START( scross )
 	MDRV_IMPORT_FROM(base)
 	MDRV_SOUND_ADD(MULTIPCM, scross_multipcm_interface)
 MACHINE_DRIVER_END
-
-static DRIVER_INIT(orunners)
-{
-	multi32=1;
-	system32_temp_kludge = 0;
-	system32_mixerShift = 4;
-}
-
-static DRIVER_INIT(titlef)
-{
-	multi32=1;
-	system32_temp_kludge = 0;
-	system32_mixerShift = 4;
-}
-
-static DRIVER_INIT(harddunk)
-{
-	multi32=1;
-	system32_temp_kludge = 0;
-	system32_mixerShift = 5;
-}
 
 #define SYSTEM32_PLAYER_INPUTS(_n_, _b1_, _b2_, _b3_, _b4_) \
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_##_b1_         | IPF_PLAYER##_n_ ) \
@@ -1120,7 +896,7 @@ ROM_START( orunners )
 	ROM_LOAD16_BYTE( "mpr15548.bin", 0x000000, 0x200000, CRC(b6470a66) SHA1(e1544590c02d41f62f82a4d771b893fb0f2734c7) )
 	ROM_LOAD16_BYTE( "mpr15549.bin", 0x000001, 0x200000, CRC(81d12520) SHA1(1555893941e832f00ad3d0b3ad0c34a0d3a1c58a) )
 
-	ROM_REGION( 0x1000000, REGION_GFX2, 0 ) /* sprites */
+	ROM_REGION32_BE( 0x1000000, REGION_GFX2, 0 ) /* sprites */
 	ROMX_LOAD( "mpr15540.bin", 0x000000, 0x200000, CRC(a10d72b4) SHA1(6d9d5e20be6721b53ce49df4d5a1bbd91f5b3aed) , ROM_SKIP(6)|ROM_GROUPWORD )
 	ROMX_LOAD( "mpr15542.bin", 0x000002, 0x200000, CRC(40952374) SHA1(c669ef52508bc2f49cf812dc86ac98fb535471fa) , ROM_SKIP(6)|ROM_GROUPWORD )
 	ROMX_LOAD( "mpr15544.bin", 0x000004, 0x200000, CRC(39e3df45) SHA1(38a7b21617b45613b05509dda388f8f7770b186c) , ROM_SKIP(6)|ROM_GROUPWORD )
@@ -1133,8 +909,6 @@ ROM_START( orunners )
 	ROM_REGION( 0x400000, REGION_SOUND1, 0 ) /* Sega PCM sound data */
 	ROM_LOAD("mpr15551.bin", 0x000000, 0x200000, CRC(4894bc73) SHA1(351f5c03fb430fd87df915dfe3a377b5ada622c4) )
 	ROM_LOAD("mpr15552.bin", 0x200000, 0x200000, CRC(1c4b5e73) SHA1(50a8e9a200575a3522a51bf094aa0e87b90bb0a3) )
-
-	ROM_REGION( 0x20000, REGION_GFX3, 0 ) /* FG tiles */
 ROM_END
 
 ROM_START( harddunk )
@@ -1153,7 +927,7 @@ ROM_START( harddunk )
 	ROM_LOAD16_BYTE( "16503", 0x000000, 0x080000, CRC(ac1b6f1a) SHA1(56482931adf7fe551acf796b74cd8af3773d4fef) )
 	ROM_LOAD16_BYTE( "16504", 0x000001, 0x080000, CRC(7c61fcd8) SHA1(ca4354f90fada752bf11ee22a7798a8aa22b1c61) )
 
-	ROM_REGION( 0x1000000, REGION_GFX2, 0 ) /* sprites */
+	ROM_REGION32_BE( 0x1000000, REGION_GFX2, 0 ) /* sprites */
 	ROMX_LOAD( "16495", 0x000000, 0x200000, CRC(6e5f26be) SHA1(146761072bbed08f4a9df8a474b34fab61afaa4f) , ROM_SKIP(6)|ROM_GROUPWORD )
 	ROMX_LOAD( "16497", 0x000002, 0x200000, CRC(42ab5859) SHA1(f50c51eb81186aec5f747ecab4c5c928f8701afc) , ROM_SKIP(6)|ROM_GROUPWORD )
 	ROMX_LOAD( "16499", 0x000004, 0x200000, CRC(a290ea36) SHA1(2503b44174f23a9d323caab86553977d1d6d9c94) , ROM_SKIP(6)|ROM_GROUPWORD )
@@ -1166,8 +940,6 @@ ROM_START( harddunk )
 	ROM_REGION( 0x400000, REGION_SOUND1, 0 ) /* Sega PCM sound data */
 	ROM_LOAD("mp16506.1", 0x000000, 0x200000, CRC(e779f5ed) SHA1(462d1bbe8bb12a0c5a6d6c613c720b26ec21cb25) )
 	ROM_LOAD("mp16507.2", 0x200000, 0x200000, CRC(31e068d3) SHA1(9ac88b15af441fb3b31ce759c565b60a09039571) )
-
-	ROM_REGION( 0x20000, REGION_GFX3, 0 ) /* FG tiles */
 ROM_END
 
 ROM_START( harddunj )
@@ -1185,7 +957,7 @@ ROM_START( harddunj )
 	ROM_LOAD16_BYTE( "16503", 0x000000, 0x080000, CRC(ac1b6f1a) SHA1(56482931adf7fe551acf796b74cd8af3773d4fef) )
 	ROM_LOAD16_BYTE( "16504", 0x000001, 0x080000, CRC(7c61fcd8) SHA1(ca4354f90fada752bf11ee22a7798a8aa22b1c61) )
 
-	ROM_REGION( 0x1000000, REGION_GFX2, 0 ) /* sprites */
+	ROM_REGION32_BE( 0x1000000, REGION_GFX2, 0 ) /* sprites */
 	ROMX_LOAD( "16495", 0x000000, 0x200000, CRC(6e5f26be) SHA1(146761072bbed08f4a9df8a474b34fab61afaa4f) , ROM_SKIP(6)|ROM_GROUPWORD )
 	ROMX_LOAD( "16497", 0x000002, 0x200000, CRC(42ab5859) SHA1(f50c51eb81186aec5f747ecab4c5c928f8701afc) , ROM_SKIP(6)|ROM_GROUPWORD )
 	ROMX_LOAD( "16499", 0x000004, 0x200000, CRC(a290ea36) SHA1(2503b44174f23a9d323caab86553977d1d6d9c94) , ROM_SKIP(6)|ROM_GROUPWORD )
@@ -1198,8 +970,6 @@ ROM_START( harddunj )
 	ROM_REGION( 0x400000, REGION_SOUND1, 0 ) /* Sega PCM sound data */
 	ROM_LOAD("mp16506.1", 0x000000, 0x200000, CRC(e779f5ed) SHA1(462d1bbe8bb12a0c5a6d6c613c720b26ec21cb25) )
 	ROM_LOAD("mp16507.2", 0x200000, 0x200000, CRC(31e068d3) SHA1(9ac88b15af441fb3b31ce759c565b60a09039571) )
-
-	ROM_REGION( 0x20000, REGION_GFX3, 0 ) /* FG tiles */
 ROM_END
 
 ROM_START( scross )
@@ -1222,7 +992,7 @@ ROM_START( scross )
 	ROM_LOAD16_BYTE( "epr15020.bin", 0x000000, 0x200000, CRC(65afea2f) SHA1(ad573727398bfac8e94f321be84b60e5690bfba6) )
 	ROM_LOAD16_BYTE( "epr15021.bin", 0x000001, 0x200000, CRC(27bc6969) SHA1(d6bb446becb2d36b73bca5055357a43b837afc0a) )
 
-	ROM_REGION( 0x1000000, REGION_GFX2, 0 ) /* sprites */
+	ROM_REGION32_BE( 0x1000000, REGION_GFX2, 0 ) /* sprites */
 	/* 1ST AND 2ND HALF IDENTICAL (all roms) */
 	ROMX_LOAD( "epr15022.bin", 0x000000, 0x200000, CRC(09ca9608) SHA1(cbd0138c1c7811d42b051fed6a7e3526cc4e457f) , ROM_SKIP(6)|ROM_GROUPWORD )
 	ROMX_LOAD( "epr15024.bin", 0x000002, 0x200000, CRC(0dc920eb) SHA1(d24d637aa0dcd3bae779ef7e12663df81667dbf7) , ROM_SKIP(6)|ROM_GROUPWORD )
@@ -1237,8 +1007,6 @@ ROM_START( scross )
 	/* 1ST AND 2ND HALF IDENTICAL (all roms, are these OK?) */
 	ROM_LOAD("epr15031.bin", 0x000000, 0x200000, CRC(663a7fd2) SHA1(b4393a687225b075db21960d19a6ddd7a9d7d086) )
 	ROM_LOAD("epr15032.bin", 0x200000, 0x200000, CRC(cb709f3d) SHA1(3962c8b5907d1f8f611f58ddac693cc47364a79c) )
-
-	ROM_REGION( 0x20000, REGION_GFX3, 0 ) /* FG tiles */
 ROM_END
 
 ROM_START( titlef )
@@ -1256,7 +1024,7 @@ ROM_START( titlef )
 	ROM_LOAD16_BYTE( "mpr15381.3", 0x000000, 0x200000, CRC(162cc4d6) SHA1(2369d3d76ab5ef8f033aa45530ab957f0e5ff028) )
 	ROM_LOAD16_BYTE( "mpr15382.11", 0x000001, 0x200000, CRC(fd03a130) SHA1(040c36383ef5d8298af714958cd5b0a4c7556ae7) )
 
-	ROM_REGION( 0x1000000, REGION_GFX2, 0 ) /* sprites */
+	ROM_REGION32_BE( 0x1000000, REGION_GFX2, 0 ) /* sprites */
 	ROMX_LOAD( "mpr15379.14", 0x000000, 0x200000, CRC(e5c74b11) SHA1(67e4460efe5dcd88ffc12024b255efc843e6a8b5) , ROM_SKIP(6)|ROM_GROUPWORD )
 	ROMX_LOAD( "mpr15375.15", 0x000002, 0x200000, CRC(046a9b50) SHA1(2b4c53f2a0264835cb7197daa9b3461c212541e8) , ROM_SKIP(6)|ROM_GROUPWORD )
 	ROMX_LOAD( "mpr15371.10", 0x000004, 0x200000, CRC(999046c6) SHA1(37ce4e8aaf537b5366eacabaf36e4477b5624121) , ROM_SKIP(6)|ROM_GROUPWORD )
@@ -1268,13 +1036,11 @@ ROM_START( titlef )
 
 	ROM_REGION( 0x300000, REGION_SOUND1, 0 ) /* Sega PCM sound data */
 	ROM_LOAD("mpr15385.1", 0x000000, 0x200000, CRC(5a9b0aa0) SHA1(d208aa165f9eea05e3b8c3f406ff44374e4f6887) )
-
-	ROM_REGION( 0x20000, REGION_GFX3, 0 ) /* FG tiles */
 ROM_END
 
 /* boot, and are playable, some gfx problems*/
-GAMEX( 1992, orunners,     0,        multi32, orunners, orunners, ROT0, "Sega", "Outrunners (US)", GAME_IMPERFECT_GRAPHICS )
-GAMEX( 1994, harddunk,     0,        multi32, harddunk, harddunk, ROT0, "Sega", "Hard Dunk (World)", GAME_IMPERFECT_GRAPHICS )
-GAMEX( 1994, harddunj,     harddunk, multi32, harddunk, harddunk, ROT0, "Sega", "Hard Dunk (Japan)", GAME_IMPERFECT_GRAPHICS )
-GAMEX( 1992, scross,       0,        scross,  scross,   orunners, ROT0, "Sega", "Stadium Cross (World)", GAME_IMPERFECT_GRAPHICS )
-GAMEX( 1992, titlef,       0,        multi32, titlef,   titlef,   ROT0, "Sega", "Title Fight (World)", GAME_IMPERFECT_GRAPHICS )
+GAMEX( 1992, orunners,     0,        multi32, orunners, 0, ROT0, "Sega", "Outrunners (US)", GAME_IMPERFECT_GRAPHICS )
+GAMEX( 1994, harddunk,     0,        multi32, harddunk, 0, ROT0, "Sega", "Hard Dunk (World)", GAME_IMPERFECT_GRAPHICS )
+GAMEX( 1994, harddunj,     harddunk, multi32, harddunk, 0, ROT0, "Sega", "Hard Dunk (Japan)", GAME_IMPERFECT_GRAPHICS )
+GAMEX( 1992, scross,       0,        scross,  scross,   0, ROT0, "Sega", "Stadium Cross (World)", GAME_IMPERFECT_GRAPHICS )
+GAMEX( 1992, titlef,       0,        multi32, titlef,   0, ROT0, "Sega", "Title Fight (World)", GAME_IMPERFECT_GRAPHICS )

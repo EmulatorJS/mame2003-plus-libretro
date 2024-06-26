@@ -34,6 +34,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Botanic (English / Spanish set 1)
 * Bronx (Cycle Shooting bootleg)
 * Bubble Bobble 2 - The Return Of Super Drunk (prototype)
+* Buccaneers
 * Bullet (unprotected of FD1094 317-0041 set)" )
 * Cabal (World, Joystick version)
 * Calorie Kun vs Moguranian
@@ -97,6 +98,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Gunbarich
 * GunMaster
 * Gut's N' Glory (Atari Prototype)
+* Hammer Away
 * Hang Zo
 * Hard Times
 * Head On Channel (Japan, Prototype)
@@ -218,7 +220,9 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * The King of Fighters 2002
 * The King of Fighters 2003
 * The Lost Castle In Darkmist
+* ThunderForce AC (Japan, prototype, bootleg)
 * Top Driving
+* Top Roller
 * Toppy & Rappy
 * Torus * Mature *
 * Touch & Go (Korea, unprotected)
@@ -323,9 +327,12 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 
 * Bubble Bobble Lost Cave
 * Bubble Bobble Ultra
+* Cyborg Force
 * Do DonPachi (Arrange Ver. 1.1) (trap15, hack)
 * Dogou Souken / Victory Road (joystick hack bootleg)
 * Donkey Kong II Jumpman Returns
+* Donkey Kong Remix
+* Donkey Kong Christmas Remix
 * Dottori-Man Jr. (Hack by Chris Covell)
 * DownTown (joystick hack)
 * Final Fight 30th Anniversary Edition (Grego And Rotwang)
@@ -363,6 +370,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Competition Golf Final Round (revision 3) - `compgolf`
 * Crater Raider - Romset `crater`
 * Crazy Climber 2 - Romset `cclimbr2`
+* DD Crew - Romset `ddcrew`
 * Demolition Derby - Romset `demoderb`
 * Die Hard Arcade - Romset `diehard` - Requires a fast system; video and sound issues remain
 * Discs Of Tron - Romsets `dotron` and `dotrone`
@@ -420,6 +428,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Power Drive - Romset `powerdrv`
 * Pro Baseball Skill Tryout - `tryout`
 * Puzzle King (PacMan 2 with Tetris & HyperMan 2 & Snow Bros - `4in1boot`
+* Rabbit - Romset `rabbit` - no sound
 * Rampage - Romsets `rampage` and `rampage2`
 * Risky Challenge - Romset `riskchal` - Playable but dont press any buttons during the score calc screen between the levels 
 * Rohga Armor Force - Romsets `rohga`, `rohgah`, `rohgau`
@@ -539,6 +548,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Bandito
 * Big Event Golf
 * Bosconian
+* Burgler X
 * Congo Bongo
 * Cookie & Bibi 2
 * Crazy Balloon
@@ -554,6 +564,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Galaga 3
 * Galaxy Rescue - (Added lrescue.zip sample support)
 * Gaplus
+* Go Go! Mile Smile / Susume! Mile Smile
 * Grobda
 * Hit The Ice
 * Horizon
@@ -579,6 +590,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Pacman & Chomp Chomp
 * Pac & Pal
 * Passing Shot (4 Player Bootleg)
+* Performan
 * Pole Position
 * Pole Position II
 * Rampage World Tour
@@ -610,6 +622,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Two Tigers - `twotigra` romset
 * WWF Wrestlemania
 * Xevious
+* Zero Point
 
 
 ## Games now with sound sample support
@@ -987,6 +1000,84 @@ Gun & Fronter, Metal Black, Ninja Kids, and Pulirula [arcadez]
 * Added some alt sprite drawing to the ssv video to prevent performance drops in some SSV games after the above updates [BritneysPAIRS]
 * Hooked up the M6801 Protection MCU for Kiki Kai Kai fixing many gameplay issues this game can now be considered 100% in the emulation dept [arcadez]
 * Updated Sega system 16/c2 gfx to support the system18 VDP gfx then added Clockwork Aquario to the system18 driver[grant2258, arcadez, mistydreams]
+* Fixed DD Crew so it is now playable in this core added support for Hammer Away and fixed the sound banking for games in system18.c [grant2258, arcadez, mistydreams]
 * Added screen flipping and fixed the cocktail mode for Asteroids, Asteroids Deluxe and Tempest [mahoneyt944]
 * Backported a graphical fix from latest MAME to fix missing shadows in Atari's Shuuz [MAMEdev, arcadez]
+* Added Donkey Kong Remix and Donkey Kong Christmas Remix hacks to dkong.c [grant2258, arcadez]
+* Emulated a missing graphical effect for Wild Fang / Tecmo Knight the screen now shakes when enemies break through walls and you land after a big jump [arcadez]
+* Fixed Player 2 Start Button for Namco's Tinkle Pit [MAMEDev, arcadez]
+* Updated the rabbit driver to MAME88 and bootstrapped the rom loading to prevent the game from hanging, Rabbit is now playable but without sound
+* as we dont have the I5000 soundcore this game would require [arcadez, mahoneyt944]
+* Added missing button 3 inputs for Strike Gunner S.T.G used to combine both ships into one during a two player game [MAMEDEv, arcadez]
+* Updated the protection code for Exerion to prevent the game from ending should you die at anytime after the first bonus round [MAMEDev, arcadez]
+* Added a new game Top Roller to the yamato.c driver and reworked the cpu encryption making it compatable with the MAME78 codebase [grant2258, arcadez]
+* Fixed some graphical niggles with Chinese Hero on level 7 [MAMEDev, arcadez]
+* Improved the sound for Go Go! Mile Smile / Susume! Mile Smile by adding sound banking and reclocking the sound and CPU speeds [MAMEDev, arcadez]
+* Fixed some grahical niggles throughout the game and with the cocktail mode for Orca's Sky Lancer [MAMEDev, arcadez]
+* Added support for Cyborg Force to the NeoGeo driver [arcadez]
+* Fixed broken sound and incorrect background graphics in Performan [MAMEDev, arcadez]
+* Improved the sound for Burgler X and Zero Point by reclocking the YM3812 sound call [MAMEDev, arcadez]
+* Added support for Buccaneers to vigilant.c and ThunderForce AC (Japan, prototype, bootleg) to the segac2.c drivers [MAMEDev, arcadez]
+* Fixed sound clipping in Karate Champ [MAMEDev, arcadez]
+* Fixed sound samples not playing in two versions of Bomber Man namely Bomber Man World (World) and New Atomic Punk - Global Quest (US) [MAMEDev, arcadez]
 
+## New and/or Recommended Input Options and Settings
+
+* Added 'X-Way Joystick' Option to Analog Controls Menu only for IPT_DIAL and IPT_DIAL_V devices.  This option is for use with x-way rotary joysticks (where the joystick can rotate X discrete steps, 8 or 12 appears to be most common).  The joystick can still move up, down, left, right and diagonally. The most famous game to use this control scheme is Ikari Warriors.
+Notes on this option:
+  - When on, prevents the character from rotating two discrete steps sometimes when the rotary joystick is just rotated one step.
+  - When on, the character will only rotate up to half the frame rate instead of the frame rate, so up to 30 times per second instead of 60 times a second if the game is running at 60Hz.
+
+* Recommended analog control settings for known games that use an x-way rotary joystick to give the intended rotary control of the character. (Note: Settings will work best if the game is running at its native 60Hz, and the time the rotary joystick "holds" down the virtual IPT_DIAL or IPT_DIAL_V button is longer than 1/60th of a second, but less than 2/60ths of a second.):
+  - Bermuda Triangle
+      Key/Joy Speed: 16
+      Sensitivity: 100%
+      X-Way Joystick: On
+  - Caliber 50
+      Key/Joy Speed: 4
+      Sensitivity: 100%
+      X-Way Joystick: On
+  - DownTown
+      Key/Joy Speed: 21
+      Sensitivity: 100%
+      X-Way Joystick: On
+  - Guerrilla War
+      Key/Joy Speed: 16
+      Sensitivity: 100%
+      X-Way Joystick: On
+  - Heavy Barrel
+      Key/Joy Speed: 21
+      Sensitivity: 100%
+      X-Way Joystick: On
+  - Ikari Warriors
+      Key/Joy Speed: 16
+      Sensitivity: 100%
+      X-Way Joystick: On
+  - Victory Road (kind of Ikari Warriors II)
+      Key/Joy Speed: 16
+      Sensitivity: 100%
+      X-Way Joystick: On
+  - Ikari III - The Rescue
+      Key/Joy Speed: 21
+      Sensitivity: 100%
+      X-Way Joystick: On
+  - Midnight Resistance
+      Key/Joy Speed: 21
+      Sensitivity: 100%
+      X-Way Joystick: On
+  - SAR - Search and Rescue
+      Key/Joy Speed: 21
+      Sensitivity: 100%
+      X-Way Joystick: On
+  - Time Soldiers
+      Key/Joy Speed: 21
+      Sensitivity: 100%
+      X-Way Joystick: On
+  - Touchdown Fever
+      Key/Joy Speed: 2
+      Sensitivity: 100%
+      X-Way Joystick: On
+  - Touchdown Fever 2
+      Key/Joy Speed: 2
+      Sensitivity: 100%
+      X-Way Joystick: On
