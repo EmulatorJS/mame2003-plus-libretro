@@ -286,7 +286,7 @@ bool opaquey_hack = false; /* dink */
  *
  *************************************/
 
-static UINT8 is_multi32;
+UINT8 is_multi32;
 
 /* tilemap cache */
 static struct cache_entry *cache_head;
@@ -381,6 +381,9 @@ static int common_start(int multi32)
 	/* initialize videoram */
 	memset(system32_videoram, 0x00, 0x20000);
 	system32_videoram[0x1ff00/2] = 0x8000;
+
+	memset(mixer_control, 0xff, sizeof(mixer_control[0][0]) * 0x80 );
+
 	return 0;
 }
 
@@ -593,8 +596,8 @@ WRITE16_HANDLER( system32_videoram_w )
 	if (offset < 0x1ff00/2)
 	{
 		struct cache_entry *entry;
-		int page = offset / 0x200;
-		offset %= 0x200;
+		int page = offset >> 9;
+		offset &= 0x1ff;
 
 		/* scan the cache for a matching pages */
 		for (entry = cache_head; entry != NULL; entry = entry->next)
@@ -606,17 +609,17 @@ WRITE16_HANDLER( system32_videoram_w )
 
 READ32_HANDLER( multi32_videoram_r )
 {
-	return system32_videoram[offset*2+0] |
-	      (system32_videoram[offset*2+1] << 16);
+	return system32_videoram[(offset<<1)|0] |
+	      (system32_videoram[(offset<<1)|1] << 16);
 }
 
 
 WRITE32_HANDLER( multi32_videoram_w )
 {
 	if ((mem_mask & 0x0000ffff) != 0x0000ffff)
-		system32_videoram_w(offset*2+0, data, mem_mask);
+		system32_videoram_w((offset<<1)|0, data, mem_mask);
 	if ((mem_mask & 0xffff0000) != 0xffff0000)
-		system32_videoram_w(offset*2+1, data >> 16, mem_mask >> 16);
+		system32_videoram_w((offset<<1)|1, data >> 16, mem_mask >> 16);
 }
 
 
@@ -635,7 +638,7 @@ READ16_HANDLER( system32_sprite_control_r )
 			/*  D1 : Seems to be '1' only during an erase in progress, this
                      occurs very briefly though.
                 D0 : Selected frame buffer (0= A, 1= B) */
-			return 0xfffc | (layer_data[MIXER_LAYER_SPRITES].bitmap < layer_data[MIXER_LAYER_SPRITES_2].bitmap);
+			return 0xfffc | (int)(layer_data[MIXER_LAYER_SPRITES].bitmap < layer_data[MIXER_LAYER_SPRITES_2].bitmap);
 
 		case 1:
 			/*  D1 : ?
@@ -694,17 +697,17 @@ WRITE16_HANDLER( system32_sprite_control_w )
 
 READ32_HANDLER( multi32_sprite_control_r )
 {
-	return system32_sprite_control_r(offset*2+0, mem_mask) |
-	      (system32_sprite_control_r(offset*2+1, mem_mask >> 16) << 16);
+	return system32_sprite_control_r((offset<<1)|0, mem_mask) |
+	      (system32_sprite_control_r((offset<<1)|1, mem_mask >> 16) << 16);
 }
 
 
 WRITE32_HANDLER( multi32_sprite_control_w )
 {
 	if ((mem_mask & 0x0000ffff) != 0x0000ffff)
-		system32_sprite_control_w(offset*2+0, data, mem_mask);
+		system32_sprite_control_w((offset<<1)|0, data, mem_mask);
 	if ((mem_mask & 0xffff0000) != 0xffff0000)
-		system32_sprite_control_w(offset*2+1, data >> 16, mem_mask >> 16);
+		system32_sprite_control_w((offset<<1)|1, data >> 16, mem_mask >> 16);
 }
 
 
@@ -724,7 +727,7 @@ READ16_HANDLER( system32_spriteram_r )
 WRITE16_HANDLER( system32_spriteram_w )
 {
 	COMBINE_DATA(&system32_spriteram[offset]);
-	spriteram_32bit[offset/2] =
+	spriteram_32bit[offset>>1] =
 		((system32_spriteram[offset |  1] >> 8 ) & 0x000000ff) |
 		((system32_spriteram[offset |  1] << 8 ) & 0x0000ff00) |
 		((system32_spriteram[offset & ~1] << 8 ) & 0x00ff0000) |
@@ -734,8 +737,8 @@ WRITE16_HANDLER( system32_spriteram_w )
 
 READ32_HANDLER( multi32_spriteram_r )
 {
-	return system32_spriteram[offset*2+0] |
-	      (system32_spriteram[offset*2+1] << 16);
+	return system32_spriteram[(offset<<1)|0] |
+	      (system32_spriteram[(offset<<1)|1] << 16);
 }
 
 
@@ -743,8 +746,8 @@ WRITE32_HANDLER( multi32_spriteram_w )
 {
 	data = SWAP_HALVES(data);
 	mem_mask = SWAP_HALVES(mem_mask);
-	COMBINE_DATA((UINT32 *)&system32_spriteram[offset*2]);
-	spriteram_32bit[offset/2] =
+	COMBINE_DATA((UINT32 *)&system32_spriteram[offset<<1]);
+	spriteram_32bit[offset>>1] =
 		((system32_spriteram[offset |  1] >> 8 ) & 0x000000ff) |
 		((system32_spriteram[offset |  1] << 8 ) & 0x0000ff00) |
 		((system32_spriteram[offset & ~1] << 8 ) & 0x00ff0000) |
@@ -849,8 +852,8 @@ static struct tilemap *find_cache_entry(int page, int bank)
 static void get_tile_info(int tile_index)
 {
 	struct cache_entry *entry = tile_info.user_data;
-	UINT16 data = system32_videoram[(entry->page & 0x7f) * 0x200 + tile_index];
-	SET_TILE_INFO(0, (entry->bank << 13) + (data & 0x1fff), (data >> 4) & 0x1ff, (data >> 14) & 3);
+	UINT16 data = system32_videoram[((entry->page & 0x7f) << 9) | tile_index];
+	SET_TILE_INFO(0, (entry->bank << 13) | (data & 0x1fff), (data >> 4) & 0x1ff, (data >> 14) & 3);
 }
 
 
@@ -1064,8 +1067,8 @@ static void update_tilemap_zoom(struct layer_info *layer, const struct rectangle
 	srcy += (system32_videoram[0x1ff14/2 + 4 * bgnum] & 0xfe00) << 4;
 
 	/* then account for the destination center coordinates */
-	srcx_start -= ((INT16)(system32_videoram[0x1ff30/2 + 2 * bgnum] << 6) >> 6) * srcxstep;
-	srcy -= ((INT16)(system32_videoram[0x1ff32/2 + 2 * bgnum] << 7) >> 7) * srcystep;
+	srcx_start -= SEXT(system32_videoram[0x1ff30/2 + 2 * bgnum], 10) * srcxstep;
+	srcy -= SEXT(system32_videoram[0x1ff32/2 + 2 * bgnum], 9) * srcystep;
 
 	/* finally, account for destination top,left coordinates */
 	srcx_start += cliprect->min_x * srcxstep;
@@ -1353,44 +1356,44 @@ static void update_tilemap_text(struct layer_info *layer, const struct rectangle
 
 					pix = (pixels >> 4) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[0] = pix;
 
 					pix = (pixels >> 0) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[1] = pix;
 
 					pix = (pixels >> 12) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[2] = pix;
 
 					pix = (pixels >> 8) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[3] = pix;
 
 					pixels = *src++;
 
 					pix = (pixels >> 4) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[4] = pix;
 
 					pix = (pixels >> 0) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[5] = pix;
 
 					pix = (pixels >> 12) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[6] = pix;
 
 					pix = (pixels >> 8) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[7] = pix;
 
 					dst += bitmap->rowpixels;
@@ -1412,44 +1415,44 @@ static void update_tilemap_text(struct layer_info *layer, const struct rectangle
 
 					pix = (pixels >> 4) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[0] = pix;
 
 					pix = (pixels >> 0) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[-1] = pix;
 
 					pix = (pixels >> 12) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[-2] = pix;
 
 					pix = (pixels >> 8) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[-3] = pix;
 
 					pix = *src++;
 
 					pix = (pixels >> 4) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[-4] = pix;
 
 					pix = (pixels >> 0) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[-5] = pix;
 
 					pix = (pixels >> 12) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[-6] = pix;
 
 					pix = (pixels >> 8) & 0x0f;
 					if (pix)
-						pix += color;
+						pix |= color;
 					dst[-7] = pix;
 
 					dst -= bitmap->rowpixels;
@@ -1779,7 +1782,7 @@ static int draw_one_sprite(UINT16 *data, int xoffs, int yoffs, const struct rect
 	};
 
 	struct mame_bitmap *bitmap = layer_data[(!is_multi32 || !(data[3] & 0x0800)) ? MIXER_LAYER_SPRITES_2 : MIXER_LAYER_MULTISPR_2].bitmap;
-	UINT8 numbanks = memory_region_length(REGION_GFX2) / 0x400000;
+	UINT8 numbanks = (memory_region_length(REGION_GFX2) >> 20)/sizeof(UINT32); /* memory_region_length in bytes */
 	const UINT32 *spritebase = (const UINT32 *)memory_region(REGION_GFX2);
 
 	int indirect = data[0] & 0x2000;
@@ -1801,8 +1804,8 @@ static int draw_one_sprite(UINT16 *data, int xoffs, int yoffs, const struct rect
 					((data[3] & 0x0800) >> 11) | ((data[3] & 0x4000) >> 13);
 	int dsth     = data[2] & 0x3ff;
 	int dstw     = data[3] & 0x3ff;
-	int ypos     = (INT16)(data[4] << 4) >> 4;
-	int xpos     = (INT16)(data[5] << 4) >> 4;
+	int ypos     = SEXT(data[4], 12);
+	int xpos     = SEXT(data[5], 12);
 	UINT32 addr  = data[6] | ((data[2] & 0xf000) << 4);
 	int color    = 0x8000 | (data[7] & (bpp8 ? 0x7f00 : 0x7ff0));
 	int hzoom, vzoom;
@@ -1839,7 +1842,7 @@ static int draw_one_sprite(UINT16 *data, int xoffs, int yoffs, const struct rect
 	{
 		if (numbanks)
 			bank %= numbanks;
-		spritedata = spritebase + 0x100000 * bank;
+		spritedata = &spritebase[bank << 20];
 		addrmask = 0xfffff;
 	}
 
@@ -2009,20 +2012,20 @@ static void sprite_render_list(void)
 				/* set the inclusive cliprect */
 				if (sprite[0] & 0x1000)
 				{
-					clipin.min_y = (INT16)(sprite[0] << 4) >> 4;
-					clipin.max_y = (INT16)(sprite[1] << 4) >> 4;
-					clipin.min_x = (INT16)(sprite[2] << 4) >> 4;
-					clipin.max_x = (INT16)(sprite[3] << 4) >> 4;
+					clipin.min_y = SEXT(sprite[0], 12);
+					clipin.max_y = SEXT(sprite[1], 12);
+					clipin.min_x = SEXT(sprite[2], 12);
+					clipin.max_x = SEXT(sprite[3], 12);
 					sect_rect(&clipin, &outerclip);
 				}
 
 				/* set the exclusive cliprect */
 				if (sprite[0] & 0x2000)
 				{
-					clipout.min_y = (INT16)(sprite[4] << 4) >> 4;
-					clipout.max_y = (INT16)(sprite[5] << 4) >> 4;
-					clipout.min_x = (INT16)(sprite[6] << 4) >> 4;
-					clipout.max_x = (INT16)(sprite[7] << 4) >> 4;
+					clipout.min_y = SEXT(sprite[4], 12);
+					clipout.max_y = SEXT(sprite[5], 12);
+					clipout.min_x = SEXT(sprite[6], 12);
+					clipout.max_x = SEXT(sprite[7], 12);
 				}
 
 				/* advance to the next entry */
@@ -2035,8 +2038,8 @@ static void sprite_render_list(void)
 				/* set the global offset */
 				if (sprite[0] & 0x2000)
 				{
-					yoffs = (INT16)(sprite[1] << 4) >> 4;
-					xoffs = (INT16)(sprite[2] << 4) >> 4;
+					yoffs = SEXT(sprite[1], 12);
+					xoffs = SEXT(sprite[2], 12);
 				}
 				spritenum = sprite[0] & 0x1fff;
 				break;
@@ -2059,7 +2062,7 @@ static void sprite_render_list(void)
  *
  *************************************/
 
-INLINE UINT8 compute_color_offsets(int which, int layerbit, int layerflag)
+static INLINE UINT8 compute_color_offsets(int which, int layerbit, int layerflag)
 {
 	int mode = ((mixer_control[which][0x3e/2] & 0x8000) >> 14) | (layerbit & 1);
 
@@ -2079,7 +2082,7 @@ INLINE UINT8 compute_color_offsets(int which, int layerbit, int layerflag)
 	}
 }
 
-INLINE UINT16 compute_sprite_blend(UINT8 encoding)
+static INLINE UINT16 compute_sprite_blend(UINT8 encoding)
 {
 	int value = encoding & 0xf;
 
@@ -2100,7 +2103,7 @@ INLINE UINT16 compute_sprite_blend(UINT8 encoding)
 	}
 }
 
-INLINE UINT16 *get_layer_scanline(int layer, int scanline)
+static INLINE UINT16 *get_layer_scanline(int layer, int scanline)
 {
 	if (layer_data[layer].transparent[scanline])
 		return (layer == MIXER_LAYER_SPRITES) ? solid_ffff : solid_0000;
@@ -2139,12 +2142,12 @@ static void mix_all_layers(int which, int xoffs, struct mame_bitmap *bitmap, con
 	}
 
 	/* extract the RGB offsets */
-	rgboffs[0][0] = (INT8)(mixer_control[which][0x40/2] << 2) >> 2;
-	rgboffs[0][1] = (INT8)(mixer_control[which][0x42/2] << 2) >> 2;
-	rgboffs[0][2] = (INT8)(mixer_control[which][0x44/2] << 2) >> 2;
-	rgboffs[1][0] = (INT8)(mixer_control[which][0x46/2] << 2) >> 2;
-	rgboffs[1][1] = (INT8)(mixer_control[which][0x48/2] << 2) >> 2;
-	rgboffs[1][2] = (INT8)(mixer_control[which][0x4a/2] << 2) >> 2;
+	rgboffs[0][0] = SEXT(mixer_control[which][0x40/2], 6);
+	rgboffs[0][1] = SEXT(mixer_control[which][0x42/2], 6);
+	rgboffs[0][2] = SEXT(mixer_control[which][0x44/2], 6);
+	rgboffs[1][0] = SEXT(mixer_control[which][0x46/2], 6);
+	rgboffs[1][1] = SEXT(mixer_control[which][0x48/2], 6);
+	rgboffs[1][2] = SEXT(mixer_control[which][0x4a/2], 6);
 	rgboffs[2][0] = 0;
 	rgboffs[2][1] = 0;
 	rgboffs[2][2] = 0;
