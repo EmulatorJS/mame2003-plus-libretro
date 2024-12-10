@@ -115,11 +115,13 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Invasion
 * Joe & Mac Returns
 * Jolly Jogger
+* Jurassic Park (Bootleg Of Megadrive Version)
 * Juezhan Tianhuang
 * Jump Kun
 * Kabuki-Z (World)
 * Ketsui: Kizuna Jigoku Tachi
 * Knightmare
+* Knights Chance (NeoGeo)
 * Last Hope
 * Led Storm Rally 2011
 * Lethal Enforcers
@@ -200,6 +202,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Snapper
 * Sonic Boom
 * Sonic The Hedgehog 2 (Bootleg Of Megadrive Version)
+* Sonic The Hedgehog 3 (Bootleg Of Megadrive Version)
 * Space Fever High Splitter
 * Space Launcher
 * Space Raider
@@ -240,6 +243,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Twin Cobra 2
 * Twin Action
 * Twinkle
+* Twinkle Tale (Bootleg Of Megadrive Version)
 * Tylz
 * Ufo Senshi Yohko Chan
 * Varia Metal
@@ -395,6 +399,8 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Fighters History - Romsets `fghthist`, `fghthsta`, and `fghthstw` - Playable with minor remaining unemulated protection
 * Find Out - Romset `findout` - colors fixed
 * Fire Barrel - Romset `firebarr`
+* Final Lap 2 - Romsets `finalap2` and `finalp2j`
+* Final Lap 3 - Romsets `finalap3` and `finalp3a`
 * Flower - Romset `flower`
 * Free Kick - Romset `freekick`
 * Funky Jet - Romset `funkyjet`
@@ -622,6 +628,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Tecmo Bowl
 * The Legend OF Silkroad
 * Thief
+* Title Fight
 * Tough Turf (Japan)
 * Tower Of Druaga
 * Toypop
@@ -1108,3 +1115,10 @@ Gun & Fronter, Metal Black, Ninja Kids, and Pulirula [arcadez]
 * Backported segas32 video driver, interrupt controllers for v60 and sound, general cleanup and merger of multi32 and system32 drivers. [mahoneyt944]
 * Backported the segaxbd driver and video code from later MAME A.B. COP, Line Of Fire, Racing Hero, Super Monaco GP
 * and Thunder Blade are now fully playable [grant2258]
+* Added support for Knights Chance to the NeoGeo driver [arcadez]
+* Fixed dip switches for Super Pac-man added new sound roms for Pac & Pal and new graphical roms which fix bad colours in Pac-man & Chomp Chomp [MAMEDev, arcadez]
+* Added the proper sprite roms for Final Lap 2 game now playable and hooked up the road colour clut proms for the Final Lap games and Suzuka 8 Hours [arcadez]
+* Fixed some missing line scrolling graphical effects in Magical Cat Adventure and Nostradamus [MAMEDev, arcadez]
+* Added three more Megadrive arcade bootlegs to segac2 namely Jurassic Park, Sonic 3 and Twinkle Tale [MAMEDev, arcadez, mahoneyt944]
+* Improved the gfx significantly for Sega's Title Fight [mahoneyt944]
+* Fixed missing and or incorrect sounds with a two player game in Title Fight [arcadez]

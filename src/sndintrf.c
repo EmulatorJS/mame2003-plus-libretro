@@ -725,7 +725,7 @@ struct snd_interface sndintf[] =
 		namco_52xx_sh_start,
 		namco_52xx_sh_stop,
 		0,
-		0
+		namco_52xx_sh_reset
 	},
 #endif
 #if (HAS_NAMCO_54XX)
@@ -737,7 +737,7 @@ struct snd_interface sndintf[] =
 		namco_54xx_sh_start,
 		namco_54xx_sh_stop,
 		0,
-		0
+		namco_54xx_sh_reset
 	},
 #endif
 #if (HAS_NAMCONA)
@@ -1121,7 +1121,7 @@ struct snd_interface sndintf[] =
 		MultiPCM_sh_start,
 		MultiPCM_sh_stop,
 		0,
-		0
+		MultiPCM_sh_reset
 	},
 #endif
 #if (HAS_C6280)

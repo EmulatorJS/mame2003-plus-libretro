@@ -12,8 +12,6 @@ extern data16_t *system32_workram;
 
 /*----------- defined in vidhrdw/segas32.c -----------*/
 
-extern UINT8 is_multi32;
-
 extern UINT16 *system32_videoram;
 extern UINT16 *system32_spriteram;
 extern UINT16 *system32_paletteram[2];
@@ -21,6 +19,7 @@ extern UINT16 system32_displayenable[2];
 extern UINT16 system32_tilebank_external;
 
 extern bool opaquey_hack;
+extern bool titlef_kludge;
 
 extern void system32_set_vblank(int state);
 
@@ -164,4 +163,4 @@ READ16_HANDLER( dbzvrvs_protection_r );
  *
  *************************************/
 
-#define SEXT(value, width) (((int64_t)(value & ((1ULL << width) - 1)) ^ (int64_t)(1ULL << (width - 1))) - (1ULL << (width - 1)))
+#define SEXT(value, width) (((int64_t)((value) & ((1ULL << (width)) - 1)) ^ (int64_t)(1ULL << ((width) - 1))) - (1ULL << ((width) - 1)))

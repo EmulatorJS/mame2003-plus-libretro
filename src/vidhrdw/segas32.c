@@ -6,18 +6,17 @@
 	  rendering.
 
 	- In radr, NBG1 should be opaque on select screen, and NBG3 should be
-	  opaque while driving. 
-	  This is controlled by register $31ff8e (respectively $200 and $800), 
-	  likewise darkedge sets $800 on the first attract fight 
-	  (which has ugly black pens which should be white according to the ref). 
-	  harddunk sets $0f00 which completely breaks text display if current 
-	  hookup is enabled. 
-	  The theory is that opaque pens should go above background layer and 
+	  opaque while driving.
+	  This is controlled by register $31ff8e (respectively $200 and $800),
+	  likewise darkedge sets $800 on the first attract fight
+	  (which has ugly black pens which should be white according to the ref).
+	  harddunk sets $0f00 which completely breaks text display if current
+	  hookup is enabled.
+	  The theory is that opaque pens should go above background layer and
 	  behind everything else like System 24.
 
-	- radr uses $1A0 as the X center for zooming; however, this
-	  contradicts the theory that bit 9 is a sign bit. For now, the code
-	  assumes that the X center has 10 bits of resolution. 
+	- Verify that X/Y center has 10 bits of resolution when zooming and
+	  9 when not.
 
 	- In svf (the field) and radr (on the field), they use tilemap-specific
 	  flip in conjunction with rowscroll AND rowselect. According to Charles,
@@ -27,23 +26,19 @@
 
 	- titlef NBG0 and NBG2 layers are currently hidden during gameplay.
 	  It sets $31ff02 with either $7be0 and $2960 (and $31ff8e is $c00).
-	  Game actually uses the "rowscroll/rowselect" tables for a line window 
-	  effect to draw the boxing ring over NBG0. 
+	  Game actually uses the "rowscroll/rowselect" tables for a line window
+	  effect to draw the boxing ring over NBG0.
 	  Same deal for ga2 when in stage 2 cave a wall torch is lit.
-	  
-	- harddunk draws solid white in attract mode when the players are presented.
-	  NBG0 is set with $200 on center X/Y, same as above or perhaps missing
-	  tilemap wraparound?
 
 	- Wrong priority cases (parenthesis for the level setup):
-	  dbzvrvs: draws text layer ($e) behind sprite-based gauges ($f). 
-	  dbzvrvs: Sheng-Long speech balloon during Piccoro ending (fixme: check levels). 
+	  dbzvrvs: draws text layer ($e) behind sprite-based gauges ($f).
+	  dbzvrvs: Sheng-Long speech balloon during Piccoro ending (fixme: check levels).
 	  f1lap: attract mode ranking sprite-based text ($a) vs. road ($d)
-	  f1lap: attract mode map display (after aforementioned), sprite-based turn names 
+	  f1lap: attract mode map display (after aforementioned), sprite-based turn names
 	  ($a) are hidden by map ($d) again;
-	  (Note: Theory about these being CPU core bug(s) is debunked by the fact that latter 
+	  (Note: Theory about these being CPU core bug(s) is debunked by the fact that latter
 	   sets up via immediate opcodes)
-	
+
     Information extracted from below, and from Modeler:
 
     Tile format:
@@ -124,14 +119,15 @@
         F44      -wwwwwww --------  Layer 1 upper-right page select
                  -------- -wwwwwww  Layer 1 upper-left page select
         F46      -wwwwwww --------  Layer 1 lower-right page select
-                 -------- -wwwwwww  Layer 2 upper-left page select
-        F48      -wwwwwww --------  Layer 2 upper-right page select
-                 -------- -wwwwwww  Layer 2 lower-left page select
-        F4A      -wwwwwww --------  Layer 2 lower-right page select
-                 -------- -wwwwwww  Layer 3 upper-left page select
-                 -wwwwwww --------  Layer 3 upper-right page select
-        F4E      -------- -wwwwwww  Layer 3 lower-left page select
-                 -wwwwwww --------  Layer 3 lower-right page select
+                 -------- -wwwwwww  Layer 1 lower-left page select
+        F48      -wwwwwww --------  Layer 2 upper-left page select
+                 -------- -wwwwwww  Layer 2 upper-right page select
+        F4A      -wwwwwww --------  Layer 2 lower-left page select
+                 -------- -wwwwwww  Layer 2 lower-right page select
+        F4C      -wwwwwww --------  Layer 3 upper-left page select
+                 -------- -wwwwwww  Layer 3 upper-right page select
+        F4E      -wwwwwww --------  Layer 3 lower-left page select
+                 -------- -wwwwwww  Layer 3 lower-right page select
         F50      xxxxxxxx xxxxxxxx  Layer 0 X step increment (0x200 = 1.0)
         F52      yyyyyyyy yyyyyyyy  Layer 0 Y step increment (0x200 = 1.0)
         F54      xxxxxxxx xxxxxxxx  Layer 1 X step increment (0x200 = 1.0)
@@ -276,7 +272,8 @@ UINT16 *system32_paletteram[2];
 UINT16 system32_displayenable[2];
 UINT16 system32_tilebank_external;
 
-bool opaquey_hack = false; /* dink */
+bool opaquey_hack  = false; /* dink */
+bool titlef_kludge = false;
 
 
 
@@ -286,7 +283,7 @@ bool opaquey_hack = false; /* dink */
  *
  *************************************/
 
-UINT8 is_multi32;
+static UINT8 is_multi32;
 
 /* tilemap cache */
 static struct cache_entry *cache_head;
@@ -852,8 +849,16 @@ static struct tilemap *find_cache_entry(int page, int bank)
 static void get_tile_info(int tile_index)
 {
 	struct cache_entry *entry = tile_info.user_data;
-	UINT16 data = system32_videoram[((entry->page & 0x7f) << 9) | tile_index];
-	SET_TILE_INFO(0, (entry->bank << 13) | (data & 0x1fff), (data >> 4) & 0x1ff, (data >> 14) & 3);
+	UINT16 data;
+
+	if (!entry)
+	{
+		SET_TILE_INFO(0, 0, 0, 0)
+		return;
+	}
+
+	data = system32_videoram[((entry->page & 0x7f) << 9) | tile_index];
+	SET_TILE_INFO(0, (entry->bank << 13) | (data & 0x1fff), (data >> 4) & 0x1ff, (data >> 14) & 3)
 }
 
 
@@ -900,10 +905,10 @@ static int compute_clipping_extents(int enable, int clipout, int clipmask, const
 		}
 		else
 		{
-			clips[i].max_x = (Machine->visible_area.max_x + 1) - (system32_videoram[0x1ff60/2 + i * 4] & 0x1ff);
-			clips[i].max_y = (Machine->visible_area.max_y + 1) - (system32_videoram[0x1ff62/2 + i * 4] & 0x0ff);
-			clips[i].min_x = (Machine->visible_area.max_x + 1) - ((system32_videoram[0x1ff64/2 + i * 4] & 0x1ff) + 1);
-			clips[i].min_y = (Machine->visible_area.max_y + 1) - ((system32_videoram[0x1ff66/2 + i * 4] & 0x0ff) + 1);
+			clips[i].max_x = (tempclip.max_x) - (system32_videoram[0x1ff60/2 + i * 4] & 0x1ff);
+			clips[i].max_y = (tempclip.max_y) - (system32_videoram[0x1ff62/2 + i * 4] & 0x0ff);
+			clips[i].min_x = (tempclip.max_x) - ((system32_videoram[0x1ff64/2 + i * 4] & 0x1ff) + 1);
+			clips[i].min_y = (tempclip.max_y) - ((system32_videoram[0x1ff66/2 + i * 4] & 0x0ff) + 1);
 		}
 		sect_rect(&clips[i], &tempclip);
 		sorted[i] = i;
@@ -1029,7 +1034,7 @@ static void update_tilemap_zoom(struct layer_info *layer, const struct rectangle
 	get_tilemaps(bgnum, tilemaps);
 
 	/* configure the layer */
-	opaque = 0;
+	opaque = (opaquey_hack) ? ((system32_videoram[0x1ff8e/2] >> (8 + bgnum)) & 1) : 0;
 //opaque = (system32_videoram[0x1ff8e/2] >> (8 + bgnum)) & 1;
 //if (code_pressed(KEYCODE_Z) && bgnum == 0) opaque = 1;
 //if (code_pressed(KEYCODE_X) && bgnum == 1) opaque = 1;
@@ -1067,8 +1072,8 @@ static void update_tilemap_zoom(struct layer_info *layer, const struct rectangle
 	srcy += (system32_videoram[0x1ff14/2 + 4 * bgnum] & 0xfe00) << 4;
 
 	/* then account for the destination center coordinates */
-	srcx_start -= SEXT(system32_videoram[0x1ff30/2 + 2 * bgnum], 10) * srcxstep;
-	srcy -= SEXT(system32_videoram[0x1ff32/2 + 2 * bgnum], 9) * srcystep;
+	srcx_start -= SEXT(system32_videoram[0x1ff30/2 + 2 * bgnum], (dstxstep != 0x200)?10:9) * srcxstep;
+	srcy -= SEXT(system32_videoram[0x1ff32/2 + 2 * bgnum], (dstystep != 0x200)?10:9) * srcystep;
 
 	/* finally, account for destination top,left coordinates */
 	srcx_start += cliprect->min_x * srcxstep;
@@ -1077,13 +1082,13 @@ static void update_tilemap_zoom(struct layer_info *layer, const struct rectangle
 	/* if we're flipped, simply adjust the start/step parameters */
 	if (flipy)
 	{
-		srcy += (Machine->visible_area.max_y - 2 * cliprect->min_y) * srcystep;
+		srcy += (cliprect->max_y - 2 * cliprect->min_y) * srcystep;
 		srcystep = -srcystep;
 	}
 
 	if (flipx)
 	{
-		srcx_start += (Machine->visible_area.max_x - 2 * cliprect->min_x) * srcxstep;
+		srcx_start += (cliprect->max_x - 2 * cliprect->min_x) * srcxstep;
 		srcxstep = -srcxstep;
 	}
 
@@ -1108,6 +1113,10 @@ static void update_tilemap_zoom(struct layer_info *layer, const struct rectangle
 			srcx = srcx_start;
 			while (1)
 			{
+				/* error out of bounds */
+				if (extents[1] > cliprect->max_x+1)
+					break;
+
 				/* if we're drawing on this extent, draw it */
 				if (clipdraw)
 				{
@@ -1229,10 +1238,10 @@ static void update_tilemap_rowscroll(struct layer_info *layer, const struct rect
 			if (!flipx)
 			{
 				srcx = cliprect->min_x + xscroll;
-				srcxstep = 1;				
+				srcxstep = 1;
 			}
 			else
-			{	
+			{
 				srcx = cliprect->max_x + xscroll;
 				srcxstep = -1;
 			}
@@ -1243,7 +1252,7 @@ static void update_tilemap_rowscroll(struct layer_info *layer, const struct rect
 			}
 			else
 			{
-				srcy = yscroll + Machine->visible_area.max_y - y;
+				srcy = yscroll + cliprect->max_y - y;
 			}
 
 			/* apply row scroll/select */
@@ -1260,6 +1269,10 @@ static void update_tilemap_rowscroll(struct layer_info *layer, const struct rect
 			/* loop over extents */
 			while (1)
 			{
+				/* error out of bounds */
+				if (extents[1] > cliprect->max_x+1)
+					break;
+
 				/* if we're drawing on this extent, draw it */
 				if (clipdraw)
 				{
@@ -1403,8 +1416,8 @@ static void update_tilemap_text(struct layer_info *layer, const struct rectangle
 			/* flipped case */
 			else
 			{
-				int effdstx = Machine->visible_area.max_x - x * 8;
-				int effdsty = Machine->visible_area.max_y - y * 8;
+				int effdstx = cliprect->max_x - x * 8;
+				int effdsty = cliprect->max_y - y * 8;
 				UINT16 *dst = ((UINT16 *)bitmap->line[effdsty]) + effdstx;
 
 				/* loop over rows */
@@ -1508,6 +1521,10 @@ static void update_bitmap(struct layer_info *layer, const struct rectangle *clip
 			/* loop over extents */
 			while (1)
 			{
+				/* error out of bounds */
+				if (extents[1] > cliprect->max_x+1)
+					break;
+
 				/* if we're drawing on this extent, draw it */
 				if (clipdraw)
 				{
@@ -1629,7 +1646,8 @@ static UINT8 update_tilemaps(const struct rectangle *cliprect)
 		update_tilemap_text(&layer_data[MIXER_LAYER_TEXT], cliprect);
 	if (enableb)
 		update_bitmap(&layer_data[MIXER_LAYER_BITMAP], cliprect);
-	update_background(&layer_data[MIXER_LAYER_BACKGROUND], cliprect);
+	if (!titlef_kludge)
+		update_background(&layer_data[MIXER_LAYER_BACKGROUND], cliprect);
 
 	return (enablet << 0) | (enable0 << 1) | (enable1 << 2) | (enable2 << 3) | (enable3 << 4) | (enableb << 5);
 }
@@ -1980,10 +1998,6 @@ static void sprite_render_list(void)
 	int spritenum = 0;
 	UINT16 *sprite;
 
-	profiler_mark(PROFILER_USER2);
-
-	logerror("----\n");
-
 	/* compute the outer clip */
 	outerclip.min_x = outerclip.min_y = 0;
 	outerclip.max_x = (sprite_control_latched[0x0c/2] & 1) ? 415 : 319;
@@ -2050,8 +2064,6 @@ static void sprite_render_list(void)
 				break;
 		}
 	}
-
-	profiler_mark(PROFILER_END);
 }
 
 
@@ -2542,9 +2554,7 @@ VIDEO_UPDATE( system32 )
 	}
 
 	/* update the tilemaps */
-	profiler_mark(PROFILER_USER1);
 	enablemask = update_tilemaps(cliprect);
-	profiler_mark(PROFILER_END);
 
 	/* debugging */
 #if QWERTY_LAYER_ENABLE
@@ -2557,9 +2567,7 @@ VIDEO_UPDATE( system32 )
 #endif
 
 	/* do the mixing */
-	profiler_mark(PROFILER_USER3);
 	mix_all_layers(0, 0, bitmap, cliprect, enablemask);
-	profiler_mark(PROFILER_END);
 
 #if LOG_SPRITES
 {
@@ -2568,50 +2576,50 @@ VIDEO_UPDATE( system32 )
 		FILE *f = fopen("sprite.txt", "w");
 		int x, y;
 
-		for (y = Machine->visible_area.min_y; y <= Machine->visible_area.max_y; y++)
+		for (y = cliprect->min_y; y <= cliprect->max_y; y++)
 		{
 			UINT16 *src = get_layer_scanline(MIXER_LAYER_SPRITES, y);
-			for (x = Machine->visible_area.min_x; x <= Machine->visible_area.max_x; x++)
+			for (x = cliprect->min_x; x <= cliprect->max_x; x++)
 				fprintf(f, "%04X ", *src++);
 			fprintf(f, "\n");
 		}
 		fclose(f);
 
 		f = fopen("nbg0.txt", "w");
-		for (y = Machine->visible_area.min_y; y <= Machine->visible_area.max_y; y++)
+		for (y = cliprect->min_y; y <= cliprect->max_y; y++)
 		{
 			UINT16 *src = get_layer_scanline(MIXER_LAYER_NBG0, y);
-			for (x = Machine->visible_area.min_x; x <= Machine->visible_area.max_x; x++)
+			for (x = cliprect->min_x; x <= cliprect->max_x; x++)
 				fprintf(f, "%04X ", *src++);
 			fprintf(f, "\n");
 		}
 		fclose(f);
 
 		f = fopen("nbg1.txt", "w");
-		for (y = Machine->visible_area.min_y; y <= Machine->visible_area.max_y; y++)
+		for (y = cliprect->min_y; y <= cliprect->max_y; y++)
 		{
 			UINT16 *src = get_layer_scanline(MIXER_LAYER_NBG1, y);
-			for (x = Machine->visible_area.min_x; x <= Machine->visible_area.max_x; x++)
+			for (x = cliprect->min_x; x <= cliprect->max_x; x++)
 				fprintf(f, "%04X ", *src++);
 			fprintf(f, "\n");
 		}
 		fclose(f);
 
 		f = fopen("nbg2.txt", "w");
-		for (y = Machine->visible_area.min_y; y <= Machine->visible_area.max_y; y++)
+		for (y = cliprect->min_y; y <= cliprect->max_y; y++)
 		{
 			UINT16 *src = get_layer_scanline(MIXER_LAYER_NBG2, y);
-			for (x = Machine->visible_area.min_x; x <= Machine->visible_area.max_x; x++)
+			for (x = cliprect->min_x; x <= cliprect->max_x; x++)
 				fprintf(f, "%04X ", *src++);
 			fprintf(f, "\n");
 		}
 		fclose(f);
 
 		f = fopen("nbg3.txt", "w");
-		for (y = Machine->visible_area.min_y; y <= Machine->visible_area.max_y; y++)
+		for (y = cliprect->min_y; y <= cliprect->max_y; y++)
 		{
 			UINT16 *src = get_layer_scanline(MIXER_LAYER_NBG3, y);
-			for (x = Machine->visible_area.min_x; x <= Machine->visible_area.max_x; x++)
+			for (x = cliprect->min_x; x <= cliprect->max_x; x++)
 				fprintf(f, "%04X ", *src++);
 			fprintf(f, "\n");
 		}
@@ -2672,12 +2680,12 @@ for (showclip = 0; showclip < 4; showclip++)
 					}
 					else
 					{
-						rect.max_x = (Machine->visible_area.max_x + 1) - (system32_videoram[0x1ff60/2 + i * 4] & 0x1ff);
-						rect.max_y = (Machine->visible_area.max_y + 1) - (system32_videoram[0x1ff62/2 + i * 4] & 0x0ff);
-						rect.min_x = (Machine->visible_area.max_x + 1) - ((system32_videoram[0x1ff64/2 + i * 4] & 0x1ff) + 1);
-						rect.min_y = (Machine->visible_area.max_y + 1) - ((system32_videoram[0x1ff66/2 + i * 4] & 0x0ff) + 1);
+						rect.max_x = (cliprect->max_x + 1) - (system32_videoram[0x1ff60/2 + i * 4] & 0x1ff);
+						rect.max_y = (cliprect->max_y + 1) - (system32_videoram[0x1ff62/2 + i * 4] & 0x0ff);
+						rect.min_x = (cliprect->max_x + 1) - ((system32_videoram[0x1ff64/2 + i * 4] & 0x1ff) + 1);
+						rect.min_y = (cliprect->max_y + 1) - ((system32_videoram[0x1ff66/2 + i * 4] & 0x0ff) + 1);
 					}
-					sect_rect(&rect, &Machine->visible_area);
+					sect_rect(&rect, cliprect);
 
 					if (rect.min_y <= rect.max_y && rect.min_x <= rect.max_x)
 					{
@@ -2701,65 +2709,71 @@ for (showclip = 0; showclip < 4; showclip++)
 	print_mixer_data(0);
 }
 
+static const int titlef_mixer[6][3] =
+{
+	{ 0x7be0, 0x0000, 0x0000 },
+	{ 0x5be0, 0x5be0, 0x0000 },
+	{ 0x52a0, 0x0000, 0x0000 },
+	{ 0x3be0, 0x0000, 0x3be0 },
+	{ 0x2960, 0x0000, 0x0000 },
+	{ 0x0000, 0x0000, 0x0000 }
+};
 
 VIDEO_UPDATE( multi32 )
 {
+	extern struct osd_create_params video_config;
 	struct rectangle clipleft, clipright;
 	UINT8 enablemask;
-  
-	int monitor_setting;
-	int monitor_display_start;
-	int monitor_display_width;
-	int monitor_vertical_offset;
+	int res;
+	int restore = system32_videoram[0x1ff02/2], remix = -1;
 
-/*
-   MAME2003-PLUS uses a single screen to draw to where as current mame
-   uses dedicated left and right screens. The machine driver doubles the
-   y max to allow for this so we must manually set our y clip max to the
-   actual maximum for drawing purposes.
-*/
-	monitor_setting=readinputport(0xf);
-	monitor_vertical_offset=1;
-	monitor_display_start=0;
-	if (monitor_setting==2) monitor_display_start=1;
-	if (monitor_setting==3) {
-		monitor_vertical_offset=2;
-		monitor_display_width=2;
-  }
-  else
-		monitor_display_width=1+monitor_display_start;
+	/* configure monitors */
+	int monitor_setting = readinputport(0xf);
+	int monitor_display_start = (monitor_setting == 3) ? 0 : monitor_setting - 1;
+	int monitor_display_width = (monitor_setting == 3) ? 2 : monitor_setting;
+	    video_config.aspect_x = (monitor_setting == 3) ? 8 : 4;
+	    video_config.aspect_y = 3;
 
 	/* update the visible area */
-	if (system32_videoram[0x1ff00/2] & 0x8000)
-	{
-		set_visible_area(52*monitor_display_start*8, 52*8*monitor_display_width-1, 0, 28*8*monitor_vertical_offset-1);
-		clipleft.min_x = 0;
-		clipleft.max_x = 52*8-1;
-		clipright.min_x = 52*8;
-		clipright.max_x = 52*2*8-1;
-	}
-	else
-	{
-		set_visible_area(40*monitor_display_start*8, 40*8*monitor_display_width-1, 0, 28*8*monitor_vertical_offset-1);
-		clipleft.min_x = 0;
-		clipleft.max_x = 40*8-1;
-		clipright.min_x = 40*8;
-		clipright.max_x = 40*2*8-1;
-	}
-	clipleft.min_y = clipright.min_y = cliprect->min_y;
-	clipleft.max_y = clipright.max_y = 28*8-1;
+	res = (system32_videoram[0x1ff00/2] & 0x8000) ? 52*8 : 40*8;
+	    set_visible_area(res*monitor_display_start, res*monitor_display_width-1, 0, 28*8-1);
+	    clipleft.min_x = 0;                 clipright.min_x = res;
+	    clipleft.max_x = res-1;             clipright.max_x = res*2-1;
+	    clipleft.min_y = cliprect->min_y;   clipright.min_y = cliprect->min_y;
+	    clipleft.max_y = cliprect->max_y;   clipright.max_y = cliprect->max_y;
 
-	/* if the display is off, punt */
+	/* if the displays are off, punt */
 	if (!system32_displayenable[0] && !system32_displayenable[1])
 	{
 		fillbitmap(bitmap, get_black_pen(), cliprect);
 		return;
 	}
 
+	if (titlef_kludge) /* force background to render */
+	{
+		int i;
+		for (i=0; titlef_mixer[i][0]!=0; i++)
+			if (system32_videoram[0x1ff02/2] == titlef_mixer[i][0])
+			{
+				system32_videoram[0x1ff02/2] = titlef_mixer[i][1];
+				if (titlef_mixer[i][1] != titlef_mixer[i][2])
+					remix = titlef_mixer[i][2];
+				break;
+			}
+
+		{ /* patch ending credits */
+			UINT16 *src1 = get_layer_scanline(MIXER_LAYER_NBG0, 0);
+			UINT16 *src2 = get_layer_scanline(MIXER_LAYER_NBG1, 0);
+			if (src1[0]==0x1902 && src1[8]==0x1901 && src1[16]==0x1902 && src1[24]==0x1901)
+				system32_videoram[0x1ff8e/2] = 0x8;
+
+			if (src2[0]==0x1902 && src2[8]==0x1901 && src2[16]==0x1902 && src2[24]==0x1901)
+				system32_videoram[0x1ff8e/2] = (system32_videoram[0x1ff8e/2]==0x8) ? 0x18 : 0x10;
+		}
+	}
+
 	/* update the tilemaps */
-	profiler_mark(PROFILER_USER1);
 	enablemask = update_tilemaps(&clipleft);
-	profiler_mark(PROFILER_END);
 
 	/* debugging */
 #if QWERTY_LAYER_ENABLE
@@ -2772,16 +2786,23 @@ VIDEO_UPDATE( multi32 )
 #endif
 
 	/* do the mixing */
-	profiler_mark(PROFILER_USER3);
-	if (system32_displayenable[0])
+	if (system32_displayenable[0] && monitor_setting != 2) /* speed up - disable offscreen monitor */
 		mix_all_layers(0, 0, bitmap, &clipleft, enablemask);
 	else
 		fillbitmap(bitmap, get_black_pen(), &clipleft);
-	if (system32_displayenable[1])
+
+	if (remix != -1)
+	{
+		system32_videoram[0x1ff02/2] = remix;
+		enablemask = update_tilemaps(&clipleft);
+	}
+	if (system32_videoram[0x1ff02/2] != restore)
+		system32_videoram[0x1ff02/2] = restore;
+
+	if (system32_displayenable[1] && monitor_setting != 1) /* speed up - disable offscreen monitor */
 		mix_all_layers(1, clipright.min_x, bitmap, &clipleft, enablemask);
 	else
 		fillbitmap(bitmap, get_black_pen(), &clipright);
-	profiler_mark(PROFILER_END);
 
 	if (!code_pressed(KEYCODE_M)) print_mixer_data(0);
 	else print_mixer_data(1);
@@ -2792,10 +2813,10 @@ VIDEO_UPDATE( multi32 )
 		FILE *f = fopen("sprite.txt", "w");
 		int x, y;
 
-		for (y = Machine->visible_area.min_y; y <= Machine->visible_area.max_y; y++)
+		for (y = clipleft.min_y; y <= clipleft.max_y; y++)
 		{
 			UINT16 *src = get_layer_scanline(MIXER_LAYER_SPRITES, y);
-			for (x = Machine->visible_area.min_x; x <= Machine->visible_area.max_x; x++)
+			for (x = clipleft.min_x; x <= clipleft.max_x; x++)
 				fprintf(f, "%04X ", *src++);
 			fprintf(f, "\n");
 		}

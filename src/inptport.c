@@ -910,7 +910,7 @@ void update_analog_port(int port)
 
 	delta = mouse_delta_axis[player][axis];
 
-	xwayjoy = (in+2)->type & IPF_XWAYJOY;
+	xwayjoy = (in+1)->type & IPF_XWAYJOY;
   last_frame = cpu_getcurrentframe() - 1;
 
 	if (seq_pressed(decseq))
@@ -1667,13 +1667,7 @@ struct InputPort* input_port_allocate(const struct InputPortTiny *src)
 		InputCode seq_default;
 
 		if (type > IPT_ANALOG_START && type < IPT_ANALOG_END)
-    {
-      if ((type == IPT_DIAL) || (type == IPT_DIAL_V))
-        /* third port stores additional data */
-			  src_end = src + 3;
-      else
-			  src_end = src + 2;
-    }
+			src_end = src + 2;
 		else
 			src_end = src + 1;
 

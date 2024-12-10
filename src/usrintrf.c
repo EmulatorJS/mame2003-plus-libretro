@@ -2021,7 +2021,7 @@ static int settraksettings(struct mame_bitmap *bitmap,int selected)
 			sensitivity = IP_GET_SENSITIVITY(entry[current_port]);
 			delta = IP_GET_DELTA(entry[current_port]);
 			reverse = (entry[current_port]->type & IPF_REVERSE);
-      xwayjoy = ((entry[current_port]+2)->type & IPF_XWAYJOY);
+      xwayjoy = ((entry[current_port]+1)->type & IPF_XWAYJOY);
 
 			strcat (label[i], " ");
 			switch (i - total_entries_to_current_port)
@@ -2122,13 +2122,13 @@ static int settraksettings(struct mame_bitmap *bitmap,int selected)
 			else if ((sel - total_entries_to_current_port) == 3)
 			/* xwayjoy */
 			{
-				int xwayjoy= (entry[current_port]+2)->type & IPF_XWAYJOY;
+				int xwayjoy= (entry[current_port]+1)->type & IPF_XWAYJOY;
 				if (xwayjoy)
 					xwayjoy=0;
 				else
 					xwayjoy=IPF_XWAYJOY;
-				(entry[current_port]+2)->type &= ~IPF_XWAYJOY;
-				(entry[current_port]+2)->type |= xwayjoy;
+				(entry[current_port]+1)->type &= ~IPF_XWAYJOY;
+				(entry[current_port]+1)->type |= xwayjoy;
 			}
 		}
 	}
@@ -2178,13 +2178,13 @@ static int settraksettings(struct mame_bitmap *bitmap,int selected)
 			else if ((sel - total_entries_to_current_port) == 3)
 			/* xwayjoy */
 			{
-				int xwayjoy= (entry[current_port]+2)->type & IPF_XWAYJOY;
+				int xwayjoy= (entry[current_port]+1)->type & IPF_XWAYJOY;
 				if (xwayjoy)
 					xwayjoy=0;
 				else
 					xwayjoy=IPF_XWAYJOY;
-				(entry[current_port]+2)->type &= ~IPF_XWAYJOY;
-				(entry[current_port]+2)->type |= xwayjoy;
+				(entry[current_port]+1)->type &= ~IPF_XWAYJOY;
+				(entry[current_port]+1)->type |= xwayjoy;
 			}
 		}
 	}
@@ -3388,6 +3388,7 @@ int handle_user_interface(struct mame_bitmap *bitmap)
   }
   else if(setup_selected)
   {
+    reset_partial_updates();
     setup_selected = setup_menu(bitmap, setup_selected);
   }
 
@@ -3436,7 +3437,7 @@ int handle_user_interface(struct mame_bitmap *bitmap)
 
 	if(toggle_showgfx) showcharset(bitmap);
 
-	if (!setup_active() && !toggle_showgfx && cpu_pause_state)
+	if (!setup_active() && !toggle_showgfx && pause_action)
 		cpu_pause(false);
 
 	return 0;

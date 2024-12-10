@@ -637,12 +637,12 @@ static UINT16 common_io_chip_r(int which, offs_t offset, UINT16 mem_mask)
 
 	switch(offset) {
 		/* I/O ports */
-		case 0x00/2:	if (port==-1) port = 1+(which*11);
-		case 0x02/2:	if (port==-1) port = 2+(which*11);
+		case 0x00/2:	if (offset==0x00/2) port = 1+(which*11);
+		case 0x02/2:	if (offset==0x02/2) port = 2+(which*11);
 		case 0x04/2:
 		case 0x06/2:
-		case 0x08/2:	if (port==-1) port = 3+(which*11);
-		case 0x0a/2:	if (port==-1) port = 0;
+		case 0x08/2:	if (offset==0x08/2) port = 3+(which*11);
+		case 0x0a/2:	if (offset==0x0a/2) port = 0;
 		case 0x0c/2:
 		case 0x0e/2:
 			/* if the port is configured as an output, return the last thing written */
@@ -731,13 +731,7 @@ static void common_io_chip_w(int which, offs_t offset, UINT16 data, UINT16 mem_m
 
 		/* CNT register */
 		case 0x1c/2:
-			if (is_multi32) /* speed up: disable off screen monitors */
-			{
-				if (readinputport(0xf) == 2-which) system32_displayenable[which] = 0;
-				else system32_displayenable[which] = (data & 0x02);
-			}
-			else
-				system32_displayenable[which] = (data & 0x02);
+			system32_displayenable[which] = (data & 0x02);
 
 			if (which == 0)
 				cpu_set_reset_line(1, (data & 0x04) ? CLEAR_LINE : ASSERT_LINE);
@@ -1035,6 +1029,16 @@ static WRITE_HANDLER( sound_bank_hi_w )
 	sound_bankptr = &RAM[0x2000*sound_bank];
 }
 
+static WRITE_HANDLER( multipcm_bank_w )
+{
+	multipcm_set_bank(0, 0x80000 * ((data >> 3) & 7), 0x80000 * (data & 7));
+}
+
+static WRITE_HANDLER( scross_bank_w )
+{
+	multipcm_set_bank(0, 0x80000 * (data & 7), 0x80000 * (data & 7));
+}
+
 static READ_HANDLER( sound_bank_r )
 {
 	return sound_bankptr[offset];
@@ -1121,7 +1125,7 @@ static PORT_WRITE_START( multi32_sound_portmap_w )
 	{ 0x82, 0x82, YM2612_control_port_0_B_w },
 	{ 0x83, 0x83, YM2612_data_port_0_B_w },
 	{ 0xa0, 0xaf, sound_bank_lo_w },
-	{ 0xb0, 0xbf, MultiPCM_bank_0_w },
+	{ 0xb0, 0xbf, multipcm_bank_w },
 	{ 0xc0, 0xcf, sound_int_control_lo_w },
 	{ 0xd0, 0xd3, sound_int_control_hi_w },
 	{ 0xf1, 0xf1, sound_dummy_w },
@@ -2465,7 +2469,7 @@ struct YM2612interface sys32_ym3438_interface =
 	{ ym3438_irq_handler }
 };
 
-struct YM2612interface mul32_ym3438_interface =
+struct YM2612interface multi32_ym3438_interface =
 {
 	1,
 	MASTER_CLOCK/4,
@@ -2474,22 +2478,10 @@ struct YM2612interface mul32_ym3438_interface =
 	{ ym3438_irq_handler }
 };
 
-static struct MultiPCM_interface mul32_multipcm_interface =
+static struct MultiPCM_interface multi32_multipcm_interface =
 {
 	1,		/* 1 chip*/
 	{ MASTER_CLOCK/4 },	/* clock*/
-	{ MULTIPCM_MODE_MULTI32 },	/* banking mode*/
-	{ (512*1024) },	/* bank size*/
-	{ REGION_SOUND1 },	/* sample region*/
-	{ YM3012_VOL(60, MIXER_PAN_CENTER, 60, MIXER_PAN_CENTER) }
-};
-
-static struct MultiPCM_interface scross_multipcm_interface =
-{
-	1,		/* 1 chip*/
-	{ MASTER_CLOCK/4 },	/* clock*/
-	{ MULTIPCM_MODE_STADCROSS },	/* banking mode*/
-	{ (512*1024) },	/* bank size*/
 	{ REGION_SOUND1 },	/* sample region*/
 	{ YM3012_VOL(60, MIXER_PAN_CENTER, 60, MIXER_PAN_CENTER) }
 };
@@ -2542,13 +2534,12 @@ static MACHINE_DRIVER_START( system32 )
 	MDRV_CPU_PORTS(system32_sound_portmap_r, system32_sound_portmap_w)
 
 	MDRV_FRAMES_PER_SECOND(60)
-	MDRV_VBLANK_DURATION(1000000 * (262 - 224) / (262 * 60))
 
 	MDRV_MACHINE_INIT(segas32)
 	MDRV_NVRAM_HANDLER(system32)
 
 	/* video hardware */
-	MDRV_VIDEO_ATTRIBUTES(VIDEO_TYPE_RASTER | VIDEO_NEEDS_6BITS_PER_GUN | VIDEO_UPDATE_AFTER_VBLANK | VIDEO_RGB_DIRECT ) /* RGB_DIRECT will be needed for alpha*/
+	MDRV_VIDEO_ATTRIBUTES(VIDEO_TYPE_RASTER | VIDEO_NEEDS_6BITS_PER_GUN | VIDEO_RGB_DIRECT )
 	MDRV_SCREEN_SIZE(52*8, 28*8)
 	MDRV_VISIBLE_AREA(0*8, 52*8-1, 0*8, 28*8-1)
 	MDRV_GFXDECODE(gfxdecodeinfo)
@@ -2562,8 +2553,13 @@ static MACHINE_DRIVER_START( system32 )
 	MDRV_SOUND_ADD(RF5C68, sys32_rf5c68_interface)
 MACHINE_DRIVER_END
 
+static MACHINE_DRIVER_START( vblank32 )
+	MDRV_IMPORT_FROM(system32)
+	MDRV_VBLANK_DURATION(1000000 * (262 - 224) / (262 * 60))
+MACHINE_DRIVER_END
 
-static MACHINE_DRIVER_START( multi32_base )
+
+static MACHINE_DRIVER_START( multi32 )
 
 	/* basic machine hardware */
 	MDRV_CPU_ADD(V60, MULTI32_CLOCK/2)
@@ -2575,15 +2571,14 @@ static MACHINE_DRIVER_START( multi32_base )
 	MDRV_CPU_PORTS(multi32_sound_portmap_r, multi32_sound_portmap_w)
 
 	MDRV_FRAMES_PER_SECOND(60)
-	MDRV_VBLANK_DURATION(1000000 * (262 - 224) / (262 * 60))
 
 	MDRV_MACHINE_INIT(segas32)
 	MDRV_NVRAM_HANDLER(system32)
 
 	/* video hardware */
-	MDRV_VIDEO_ATTRIBUTES(VIDEO_TYPE_RASTER | VIDEO_NEEDS_6BITS_PER_GUN | VIDEO_UPDATE_AFTER_VBLANK | VIDEO_RGB_DIRECT ) /* RGB_DIRECT will be needed for alpha*/
-	MDRV_SCREEN_SIZE(52*8*2, 28*8*2)
-	MDRV_VISIBLE_AREA(0*8, 52*8*2-1, 0*8, 28*8*2-1)
+	MDRV_VIDEO_ATTRIBUTES(VIDEO_TYPE_RASTER | VIDEO_NEEDS_6BITS_PER_GUN | VIDEO_RGB_DIRECT )
+	MDRV_SCREEN_SIZE(52*8*2, 28*8)
+	MDRV_VISIBLE_AREA(0*8, 52*8*2-1, 0*8, 28*8-1)
 
 	MDRV_GFXDECODE(gfxdecodeinfo)
 	MDRV_PALETTE_LENGTH(32768)
@@ -2592,17 +2587,8 @@ static MACHINE_DRIVER_START( multi32_base )
 	MDRV_VIDEO_UPDATE(multi32)
 
 	MDRV_SOUND_ATTRIBUTES(SOUND_SUPPORTS_STEREO)
-	MDRV_SOUND_ADD(YM3438, mul32_ym3438_interface)
-MACHINE_DRIVER_END
-
-static MACHINE_DRIVER_START( multi32 )
-	MDRV_IMPORT_FROM(multi32_base)
-	MDRV_SOUND_ADD(MULTIPCM, mul32_multipcm_interface)
-MACHINE_DRIVER_END
-
-static MACHINE_DRIVER_START( scross )
-	MDRV_IMPORT_FROM(multi32_base)
-	MDRV_SOUND_ADD(MULTIPCM, scross_multipcm_interface)
+	MDRV_SOUND_ADD(YM3438, multi32_ym3438_interface)
+	MDRV_SOUND_ADD(MULTIPCM, multi32_multipcm_interface)
 MACHINE_DRIVER_END
 
 
@@ -3648,6 +3634,17 @@ static DRIVER_INIT( dbzvrvs )
 	install_mem_write16_handler(0, 0xa00000, 0xa7ffff, dbzvrvs_protection_w);
 }
 
+static DRIVER_INIT( titlef )
+{
+	install_port_write_handler(1,  0xb0, 0xbf, scross_bank_w);
+	titlef_kludge = true;
+}
+
+static DRIVER_INIT( scross )
+{
+	install_port_write_handler(1,  0xb0, 0xbf, scross_bank_w);
+}
+
 /* this one is pretty much ok since it doesn't use backgrounds tilemaps */
 GAME( 1992, holo,     0,        system32, holo,     s32,      ORIENTATION_FLIP_Y, "Sega", "Holosseum" )
 
@@ -3664,21 +3661,21 @@ GAMEX(1992, ga2j,     ga2,      system32, ga2j,     ga2,      ROT0, "Sega", "Gol
 GAMEX(1992, brival,   0,        system32, brival,   brival,   ROT0, "Sega", "Burning Rival (Japan)", GAME_IMPERFECT_GRAPHICS )
 GAMEX(1992, sonic,    0,        system32, sonic,    sonic,    ROT0, "Sega", "Segasonic the Hedgehog (Japan rev. C)", GAME_IMPERFECT_GRAPHICS )
 GAMEX(1992, sonicp,   sonic,    system32, sonic,    sonicp,   ROT0, "Sega", "Segasonic the Hedgehog (Japan prototype)", GAME_IMPERFECT_GRAPHICS )
-GAMEX(1993, alien3,   0,        system32, alien3,   alien3,   ROT0, "Sega", "Alien3: The Gun", GAME_IMPERFECT_GRAPHICS )
+GAMEX(1993, alien3,   0,        vblank32, alien3,   alien3,   ROT0, "Sega", "Alien3: The Gun", GAME_IMPERFECT_GRAPHICS )
 GAMEX(1994, jpark,    0,        system32, jpark,    jpark,    ROT0, "Sega", "Jurassic Park", GAME_IMPERFECT_GRAPHICS )
 GAMEX(1994, svf,      0,        system32, svf,      s32,      ROT0, "Sega", "Super Visual Football - European Sega Cup", GAME_IMPERFECT_GRAPHICS )
 GAMEX(1994, svs,      svf,      system32, svf,      s32,      ROT0, "Sega", "Super Visual Soccer - Sega Cup (US)", GAME_IMPERFECT_GRAPHICS )
 GAMEX(1994, jleague,  svf,      system32, svf,      jleague,  ROT0, "Sega", "The J.League 1994 (Japan)", GAME_IMPERFECT_GRAPHICS )
-GAMEX(1993, f1lap,    0,        system32, f1lap,	  f1sl,     ROT0, "Sega", "F1 Super Lap (World)", GAME_IMPERFECT_GRAPHICS )
-GAMEX(1993, f1lapj,   f1lap,    system32, f1lap,	  f1sl,     ROT0, "Sega", "F1 Super Lap (Japan)", GAME_IMPERFECT_GRAPHICS )
+GAMEX(1993, f1lap,    0,        system32, f1lap,    f1sl,     ROT0, "Sega", "F1 Super Lap (World)", GAME_IMPERFECT_GRAPHICS )
+GAMEX(1993, f1lapj,   f1lap,    system32, f1lap,    f1sl,     ROT0, "Sega", "F1 Super Lap (Japan)", GAME_IMPERFECT_GRAPHICS )
 GAMEX(1993, darkedge, 0,        system32, darkedge, darkedge, ROT0, "Sega", "Dark Edge", GAME_IMPERFECT_GRAPHICS )
-GAMEX(1994, dbzvrvs,  0,        system32, system32,	dbzvrvs,  ROT0, "Sega / Banpresto", "Dragon Ball Z V.R.V.S.", GAME_IMPERFECT_GRAPHICS )
-GAMEX(1995, slipstrm, 0,        system32, slipstrm,	f1en,     ROT0, "Capcom", "Slipstream (Brazil)", GAME_IMPERFECT_GRAPHICS )
-GAMEX(1995, slipstrh, slipstrm, system32, slipstrm,	f1en,     ROT0, "Capcom", "Slipstream (Hispanic)", GAME_IMPERFECT_GRAPHICS )
+GAMEX(1994, dbzvrvs,  0,        system32, system32, dbzvrvs,  ROT0, "Sega / Banpresto", "Dragon Ball Z V.R.V.S.", GAME_IMPERFECT_GRAPHICS )
+GAMEX(1995, slipstrm, 0,        system32, slipstrm, f1en,     ROT0, "Capcom", "Slipstream (Brazil)", GAME_IMPERFECT_GRAPHICS )
+GAMEX(1995, slipstrh, slipstrm, system32, slipstrm, f1en,     ROT0, "Capcom", "Slipstream (Hispanic)", GAME_IMPERFECT_GRAPHICS )
 
 /* Multi32 games */
 GAMEX(1992, orunners, 0,        multi32,  orunners, 0,        ROT0, "Sega", "Outrunners (US)", GAME_IMPERFECT_GRAPHICS )
 GAMEX(1994, harddunk, 0,        multi32,  harddunk, 0,        ROT0, "Sega", "Hard Dunk (World)", GAME_IMPERFECT_GRAPHICS )
 GAMEX(1994, harddunj, harddunk, multi32,  harddunk, 0,        ROT0, "Sega", "Hard Dunk (Japan)", GAME_IMPERFECT_GRAPHICS )
-GAMEX(1992, scross,   0,        scross,   scross,   0,        ROT0, "Sega", "Stadium Cross (World)", GAME_IMPERFECT_GRAPHICS )
-GAMEX(1992, titlef,   0,        multi32,  titlef,   0,        ROT0, "Sega", "Title Fight (World)", GAME_IMPERFECT_GRAPHICS )
+GAMEX(1992, scross,   0,        multi32,  scross,   scross,   ROT0, "Sega", "Stadium Cross (World)", GAME_IMPERFECT_GRAPHICS )
+GAMEX(1992, titlef,   0,        multi32,  titlef,   titlef,   ROT0, "Sega", "Title Fight (World)", GAME_IMPERFECT_GRAPHICS )

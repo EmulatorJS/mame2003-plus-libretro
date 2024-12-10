@@ -563,14 +563,18 @@ const struct GameDriver *test_drivers[] =
 	DRIVER( liblrabl )	/* (c) 1983 */
 	DRIVER( toypop )	/* (c) 1986 */
 	/* Z8000 games */
-	DRIVER( polepos )	/* (c) 1982  */
-	DRIVER( poleposa )	/* (c) 1982 + Atari license */
-	DRIVER( polepos1 )	/* (c) 1982 Atari */
-	DRIVER( topracer )	/* bootleg */
-	DRIVER( polepos2 )	/* (c) 1983 */
-	DRIVER( poleps2a )	/* (c) 1983 + Atari license */
-	DRIVER( poleps2b )	/* bootleg */
-/*	DRIVER( poleps2c )	 bootleg */
+	DRIVER( polepos )
+	DRIVER( poleposj )
+	DRIVER( poleposa1 )
+	DRIVER( poleposa1n )
+	DRIVER( poleposa2 )
+	DRIVER( topracer )
+	DRIVER( topracera )
+	DRIVER( ppspeed )
+	DRIVER( polepos2 )
+	DRIVER( polepos2a) 
+	DRIVER( polepos2b )
+
 	/* no custom I/O in the following, HD63701 (or compatible) microcontroller instead */
 	DRIVER( pacland )	/* (c) 1984 */
 	DRIVER( pacland2 )	/* (c) 1984 */
@@ -2168,6 +2172,7 @@ V-V                           TP-027
 	DRIVER( knightsu )	/* 27/11/1991 (c) 1991 (US)    */
 	DRIVER( knightsj )	/* 27/11/1991 (c) 1991 (Japan) */
 	DRIVER( sf2ce )		/* 13/03/1992 (c) 1992 (World) */
+	DRIVER( sf2mix )		/* 13/03/1992 (c) 1992 (World) */
 	DRIVER( sf2ceua )	/* 13/03/1992 (c) 1992 (US)    */
 	DRIVER( sf2ceub )	/* 13/05/1992 (c) 1992 (US)    */
 	DRIVER( sf2ceuc )	/* 03/08/1992 (c) 1992 (US)    */
@@ -3007,6 +3012,7 @@ DokiDoki Penguin Land *not confirmed
 	DRIVER( astormbl )	/* bootleg */
 	DRIVER( atomicp )	/* (c) 1990 Philko */
 	DRIVER( snapper )	/* (c) 1990 Philko */
+	DRIVER( dfjail )	/* (c) 1991 Philko */
 	DRIVER( aurail )	/* (c) 1990 Sega / Westone */
 	DRIVER( aurail1d )	/* (c) 1990 Sega / Westone */
 	DRIVER( aurailjd )	/* (c) 1990 Sega / Westone */
@@ -3250,6 +3256,9 @@ BOMULEUL CHAJARA SEGA ST-V  1997/04/11
   DRIVER( aladmdb ) /*  (c) 1993 bootleg / Sega */
   DRIVER( barek2ch ) /* (c) 1994 bootleg / Sega */
   DRIVER( sonic2mb ) /* (c) 1993 bootleg / Sega */
+  DRIVER( sonic3mb ) /* (c) 1993 bootleg / Sega */
+  DRIVER( jparkmb )  /* (c) 1993 bootleg / Sega */
+  DRIVER( twinktmb )  /* (c) 1993 bootleg / Sega */
 
 	/* Sega MegaTech, the number shown ia on the label of the instruction rom */
 	DRIVER( mt_beast )	/* 01 */
@@ -6067,7 +6076,8 @@ Other Sun games
 	DRIVER( kf10thep)       /* bootleg of kof2002 */
 	DRIVER( kf2k5uni)       /* bootleg of kof2002 */
 	DRIVER( lasthope )      /* (c) 2005 NG:DEV.TEAM */
-	DRIVER(  xeno )         /* (c) 2019 Bitmap Bureau */
+  DRIVER( knightsch )     /* (c) 2014 Neobitz */
+	DRIVER( xeno )          /* (c) 2019 Bitmap Bureau */
 	DRIVER( hypernoid )     /* 2021 M.Priewe */
 	DRIVER( cyborgforce )   /* (c) 2023 Neo Byte Force Ltd */
 
