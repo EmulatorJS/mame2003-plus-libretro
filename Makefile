@@ -6,6 +6,7 @@ DEBUG         ?= 0
 DEBUGGER      ?= 0
 SPLIT_UP_LINK ?= 0
 ARM           ?= 0 # set to 0 or 1 to indicate ARM or not
+HAVE_ARMv6    ?= 0
 CPU_ARCH      ?= 0 # as of November 2018 this flag doesn't seem to be used but is being set to either arm or arm64 for some platforms
 
 LIBS          ?=
@@ -182,6 +183,7 @@ else ifeq ($(platform), rpi0)
 	CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions
 	CPU_ARCH := arm
 	ARM = 1
+	HAVE_ARMv6 = 1
 
 # Raspberry Pi 1
 else ifeq ($(platform), rpi1)
@@ -194,6 +196,7 @@ else ifeq ($(platform), rpi1)
 	CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions
 	CPU_ARCH := arm
 	ARM = 1
+	HAVE_ARMv6 = 1
 
 # Raspberry Pi 2
 else ifeq ($(platform), rpi2)
@@ -206,6 +209,7 @@ else ifeq ($(platform), rpi2)
 	CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions
 	CPU_ARCH := arm
 	ARM = 1
+	HAVE_ARMv6 = 1
 
 # Raspberry Pi 3
 else ifeq ($(platform), rpi3)
@@ -218,6 +222,7 @@ else ifeq ($(platform), rpi3)
 	CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions
 	CPU_ARCH := arm
 	ARM = 1
+	HAVE_ARMv6 = 1
 
 # Raspberry Pi 3 (AArch64)
 else ifeq ($(platform), rpi3_64)
@@ -241,6 +246,7 @@ else ifeq ($(platform), rpi4)
 	CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions
 	CPU_ARCH := arm
 	ARM = 1
+	HAVE_ARMv6 = 1
 
 # Raspberry Pi 4 (AArch64)
 else ifeq ($(platform), rpi4_64)
@@ -273,6 +279,7 @@ else ifeq ($(platform), classic_armv7_a7)
 	ARCH = arm
 	CPU_ARCH := arm
 	ARM = 1
+	HAVE_ARMv6 = 1
 	ifeq ($(shell echo `$(CC) -dumpversion` "< 4.9" | bc -l), 1)
 		CFLAGS += -march=armv7-a
 	else
@@ -303,6 +310,7 @@ else ifeq ($(platform), s812)
 	ARCH = arm
 	CPU_ARCH := arm
 	ARM = 1
+	HAVE_ARMv6 = 1
 
 # Playstation Classic
 else ifeq ($(platform), classic_armv8_a35)
@@ -324,6 +332,7 @@ else ifeq ($(platform), classic_armv8_a35)
 	ARCH = arm
 	CPU_ARCH := arm
 	ARM = 1
+	HAVE_ARMv6 = 1
 	CFLAGS += -march=armv8-a
 	LDFLAGS += -static-libgcc -static-libstdc++
 
@@ -472,6 +481,7 @@ else ifeq ($(platform), vita)
 	CXXFLAGS = $(CFLAGS) -fno-rtti -fno-exceptions
 	HAVE_RZLIB := 1
 	ARM = 1
+	HAVE_ARMv6 = 1
 	STATIC_LINKING := 1
 	USE_CYCLONE := 1
 	USE_DRZ80 := 1
@@ -524,11 +534,14 @@ else ifeq ($(platform), miyoo)
 	CC = /opt/miyoo/usr/bin/arm-linux-gcc
 	CXX = /opt/miyoo/usr/bin/arm-linux-g++
 	AR = /opt/miyoo/usr/bin/arm-linux-ar
-	fpic := -fPIC
+	fpic := -fno-PIC
 	LDFLAGS += -shared -Wl,--version-script=link.T -Wl,-no-undefined
 	PLATCFLAGS := -DNO_UNALIGNED_ACCESS
 	PLATCFLAGS += -fomit-frame-pointer -march=armv5te -mtune=arm926ej-s -ffast-math
 	CXXFLAGS += -fno-rtti -fno-exceptions
+	ARM = 1
+	USE_CYCLONE := 1
+	USE_DRZ80 := 1
 
 # Emscripten
 else ifeq ($(platform), emscripten)
@@ -766,7 +779,7 @@ else
 	LDFLAGS += -shared -static-libgcc -static-libstdc++
    	ifneq ($(DEBUG), 1)
    	LDFLAGS += -s
-   	endif  
+   	endif
    	LDFLAGS += -Wl,--version-script=link.T
 	CFLAGS += -D__WIN32__
 endif
@@ -817,6 +830,11 @@ CFLAGS += -DHAVE_SOCKLEN_T
 CFLAGS += -D_LARGEFILE_SOURCE
 CFLAGS += -D_FILE_OFFSET_BITS=64
 
+# make gcc fail like msvc does
+ifeq (,$(findstring msvc,$(platform)))
+	CFLAGS += -Werror=vla -Werror=declaration-after-statement
+endif
+
 # Required for RZIP support in cheat.c
 CFLAGS += -DHAVE_ZLIB
 
@@ -849,6 +867,10 @@ else
 endif
 endif
 
+ifeq ($(HAVE_ARMv6),1)
+	CFLAGS += -DHAVE_ARMv6
+endif
+
 # include the various .mak files
 ifneq (,$(filter $(INCLUDE_DRV),all))
 	include Makefile.common
@@ -865,7 +887,7 @@ CFLAGS += $(INCFLAGS) $(INCFLAGS_PLATFORM)
 # combine the various definitions to one
 CDEFS = $(DEFS) $(CPUDEFS) $(SOUNDDEFS) $(ASMDEFS) $(DBGDEFS)
 
-OBJECTS := $(SOURCES_C:.c=.o) $(SOURCES_ASM:.s=.o)
+OBJECTS := $(SOURCES_C:.c=.o) $(SOURCES_ASM:.s=.o) $(SOURCES_ASM_PP:.S=.o)
 
 OBJOUT   = -o
 LINKOUT  = -o 

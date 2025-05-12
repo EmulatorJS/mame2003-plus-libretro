@@ -1017,6 +1017,28 @@ static INLINE void get_tilemaps(int bgnum, struct tilemap **tilemaps)
 }
 
 
+static int patch_enable(int in, int bgnum)
+{
+	if (!titlef_kludge) return in;
+
+	switch (system32_videoram[0x1ff02/2])
+	{
+		case 0x7be0:
+		case 0x52a0:
+		case 0x2960:
+			return 0;
+
+		case 0x5be0:
+			return (bgnum%2 == 0) ? in : 0;
+
+		case 0x3be0:
+			return (bgnum%2 == 1) ? in : 0;
+
+		default: return in;
+	}
+}
+
+
 static void update_tilemap_zoom(struct layer_info *layer, const struct rectangle *cliprect, int bgnum)
 {
 	int clipenable, clipout, clips, clipdraw_start;
@@ -1043,7 +1065,7 @@ static void update_tilemap_zoom(struct layer_info *layer, const struct rectangle
 	compute_tilemap_flips(bgnum, &flipx, &flipy);
 
 	/* determine the clipping */
-	clipenable = (system32_videoram[0x1ff02/2] >> (11 + bgnum)) & 1;
+	clipenable = patch_enable((system32_videoram[0x1ff02/2] >> (11 + bgnum)) & 1, bgnum);
 	clipout = (system32_videoram[0x1ff02/2] >> (6 + bgnum)) & 1;
 	clips = (system32_videoram[0x1ff06/2] >> (4 * bgnum)) & 0x0f;
 	clipdraw_start = compute_clipping_extents(clipenable, clipout, clips, cliprect, &clip_extents);
@@ -1071,9 +1093,14 @@ static void update_tilemap_zoom(struct layer_info *layer, const struct rectangle
 	srcy = (system32_videoram[0x1ff16/2 + 4 * bgnum] & 0x1ff) << 20;
 	srcy += (system32_videoram[0x1ff14/2 + 4 * bgnum] & 0xfe00) << 4;
 
-	/* then account for the destination center coordinates */
-	srcx_start -= SEXT(system32_videoram[0x1ff30/2 + 2 * bgnum], (dstxstep != 0x200)?10:9) * srcxstep;
-	srcy -= SEXT(system32_videoram[0x1ff32/2 + 2 * bgnum], (dstystep != 0x200)?10:9) * srcystep;
+	/*
+	   Then account for the destination center coordinates - We currently expand the resolution
+	   from 9 bit to 10 bit while zooming which correctly centers the bg during attract mode in
+	   harddunk at the lower resolution and the course selection bg in radr at the higher resolution.
+	   This behavior has not been verified yet on real hardware and might be a hack.
+	*/
+	srcx_start -= SEXT(system32_videoram[0x1ff30/2 + 2 * bgnum], (dstxstep != 0x200) ? 10 : 9) * srcxstep;
+	srcy -= SEXT(system32_videoram[0x1ff32/2 + 2 * bgnum], (dstystep != 0x200) ? 10 : 9) * srcystep;
 
 	/* finally, account for destination top,left coordinates */
 	srcx_start += cliprect->min_x * srcxstep;
@@ -1202,7 +1229,7 @@ static void update_tilemap_rowscroll(struct layer_info *layer, const struct rect
 	compute_tilemap_flips(bgnum, &flipx, &flipy);
 
 	/* determine the clipping */
-	clipenable = (system32_videoram[0x1ff02/2] >> (11 + bgnum)) & 1;
+	clipenable = patch_enable((system32_videoram[0x1ff02/2] >> (11 + bgnum)) & 1, bgnum);
 	clipout = (system32_videoram[0x1ff02/2] >> (6 + bgnum)) & 1;
 	clips = (system32_videoram[0x1ff06/2] >> (4 * bgnum)) & 0x0f;
 	clipdraw_start = compute_clipping_extents(clipenable, clipout, clips, cliprect, &clip_extents);
@@ -1632,6 +1659,16 @@ static UINT8 update_tilemaps(const struct rectangle *cliprect)
 	int enable3 = !(system32_videoram[0x1ff02/2] & 0x0008) && !(system32_videoram[0x1ff8e/2] & 0x0010) && !(system32_videoram[0x1ff00/2] & 0x2000);
 	int enablet = !(system32_videoram[0x1ff02/2] & 0x0010) && !(system32_videoram[0x1ff8e/2] & 0x0001);
 	int enableb = !(system32_videoram[0x1ff02/2] & 0x0020) && !(system32_videoram[0x1ff8e/2] & 0x0020);
+
+	if (titlef_kludge) /* patch ending credits */
+	{
+		UINT16 *src1 = (UINT16 *)layer_data[MIXER_LAYER_NBG0].bitmap->line[0];
+		UINT16 *src2 = (UINT16 *)layer_data[MIXER_LAYER_NBG1].bitmap->line[0];
+		if (src1[0]==0x1902 && src1[8]==0x1901 && src1[16]==0x1902 && src1[24]==0x1901)
+			enable2 = 0;
+		if (src2[0]==0x1902 && src2[8]==0x1901 && src2[16]==0x1902 && src2[24]==0x1901)
+			enable3 = 0;
+	}
 
 	/* update any tilemaps */
 	if (enable0)
@@ -2556,168 +2593,10 @@ VIDEO_UPDATE( system32 )
 	/* update the tilemaps */
 	enablemask = update_tilemaps(cliprect);
 
-	/* debugging */
-#if QWERTY_LAYER_ENABLE
-	if (code_pressed(KEYCODE_Q)) enablemask = 0x01;
-	if (code_pressed(KEYCODE_W)) enablemask = 0x02;
-	if (code_pressed(KEYCODE_E)) enablemask = 0x04;
-	if (code_pressed(KEYCODE_R)) enablemask = 0x08;
-	if (code_pressed(KEYCODE_T)) enablemask = 0x10;
-	if (code_pressed(KEYCODE_Y)) enablemask = 0x20;
-#endif
-
 	/* do the mixing */
 	mix_all_layers(0, 0, bitmap, cliprect, enablemask);
-
-#if LOG_SPRITES
-{
-	if (code_pressed(KEYCODE_L))
-	{
-		FILE *f = fopen("sprite.txt", "w");
-		int x, y;
-
-		for (y = cliprect->min_y; y <= cliprect->max_y; y++)
-		{
-			UINT16 *src = get_layer_scanline(MIXER_LAYER_SPRITES, y);
-			for (x = cliprect->min_x; x <= cliprect->max_x; x++)
-				fprintf(f, "%04X ", *src++);
-			fprintf(f, "\n");
-		}
-		fclose(f);
-
-		f = fopen("nbg0.txt", "w");
-		for (y = cliprect->min_y; y <= cliprect->max_y; y++)
-		{
-			UINT16 *src = get_layer_scanline(MIXER_LAYER_NBG0, y);
-			for (x = cliprect->min_x; x <= cliprect->max_x; x++)
-				fprintf(f, "%04X ", *src++);
-			fprintf(f, "\n");
-		}
-		fclose(f);
-
-		f = fopen("nbg1.txt", "w");
-		for (y = cliprect->min_y; y <= cliprect->max_y; y++)
-		{
-			UINT16 *src = get_layer_scanline(MIXER_LAYER_NBG1, y);
-			for (x = cliprect->min_x; x <= cliprect->max_x; x++)
-				fprintf(f, "%04X ", *src++);
-			fprintf(f, "\n");
-		}
-		fclose(f);
-
-		f = fopen("nbg2.txt", "w");
-		for (y = cliprect->min_y; y <= cliprect->max_y; y++)
-		{
-			UINT16 *src = get_layer_scanline(MIXER_LAYER_NBG2, y);
-			for (x = cliprect->min_x; x <= cliprect->max_x; x++)
-				fprintf(f, "%04X ", *src++);
-			fprintf(f, "\n");
-		}
-		fclose(f);
-
-		f = fopen("nbg3.txt", "w");
-		for (y = cliprect->min_y; y <= cliprect->max_y; y++)
-		{
-			UINT16 *src = get_layer_scanline(MIXER_LAYER_NBG3, y);
-			for (x = cliprect->min_x; x <= cliprect->max_x; x++)
-				fprintf(f, "%04X ", *src++);
-			fprintf(f, "\n");
-		}
-		fclose(f);
-	}
-}
-#endif
-
-#if SHOW_ALPHA
-{
-	static const char *layername[] = { "TEXT ", "NBG0 ", "NBG1 ", "NBG2 ", "NBG3 ", "BITMAP " };
-	char temp[100];
-	int count = 0, i;
-	sprintf(temp, "ALPHA(%d):", (mixer_control[which][0x4e/2] >> 8) & 7);
-	for (i = 0; i < 6; i++)
-		if (enablemask & (1 << i))
-			if ((mixer_control[which][0x30/2 + i] & 0x1010) == 0x1010)
-			{
-				count++;
-				strcat(temp, layername[i]);
-			}
-	if (count)
-		usrintf_showmessage("%s", temp);
-}
-#endif
-
-#if SHOW_CLIPS
-{
-	int showclip = -1;
-
-//  if (code_pressed(KEYCODE_V))
-//      showclip = 0;
-//  if (code_pressed(KEYCODE_B))
-//      showclip = 1;
-//  if (code_pressed(KEYCODE_N))
-//      showclip = 2;
-//  if (code_pressed(KEYCODE_M))
-//      showclip = 3;
-//  if (showclip != -1)
-for (showclip = 0; showclip < 4; showclip++)
-	{
-		int flip = (system32_videoram[0x1ff00/2] >> 9) & 1;
-		int clips = (system32_videoram[0x1ff06/2] >> (4 * showclip)) & 0x0f;
-		if (((system32_videoram[0x1ff02/2] >> (11 + showclip)) & 1) && clips)
-		{
-			int i, x, y;
-			for (i = 0; i < 4; i++)
-				if (clips & (1 << i))
-				{
-					struct rectangle rect;
-					pen_t white = Machine->uifont->colortable[1];
-					if (!flip)
-					{
-						rect.min_x = system32_videoram[0x1ff60/2 + i * 4] & 0x1ff;
-						rect.min_y = system32_videoram[0x1ff62/2 + i * 4] & 0x0ff;
-						rect.max_x = (system32_videoram[0x1ff64/2 + i * 4] & 0x1ff) + 1;
-						rect.max_y = (system32_videoram[0x1ff66/2 + i * 4] & 0x0ff) + 1;
-					}
-					else
-					{
-						rect.max_x = (cliprect->max_x + 1) - (system32_videoram[0x1ff60/2 + i * 4] & 0x1ff);
-						rect.max_y = (cliprect->max_y + 1) - (system32_videoram[0x1ff62/2 + i * 4] & 0x0ff);
-						rect.min_x = (cliprect->max_x + 1) - ((system32_videoram[0x1ff64/2 + i * 4] & 0x1ff) + 1);
-						rect.min_y = (cliprect->max_y + 1) - ((system32_videoram[0x1ff66/2 + i * 4] & 0x0ff) + 1);
-					}
-					sect_rect(&rect, cliprect);
-
-					if (rect.min_y <= rect.max_y && rect.min_x <= rect.max_x)
-					{
-						for (y = rect.min_y; y <= rect.max_y; y++)
-						{
-							bitmap->plot(bitmap, rect.min_x, y, white);
-							bitmap->plot(bitmap, rect.max_x, y, white);
-						}
-						for (x = rect.min_x; x <= rect.max_x; x++)
-						{
-							bitmap->plot(bitmap, x, rect.min_y, white);
-							bitmap->plot(bitmap, x, rect.max_y, white);
-						}
-					}
-				}
-		}
-	}
-}
-#endif
-
-	print_mixer_data(0);
 }
 
-static const int titlef_mixer[6][3] =
-{
-	{ 0x7be0, 0x0000, 0x0000 },
-	{ 0x5be0, 0x5be0, 0x0000 },
-	{ 0x52a0, 0x0000, 0x0000 },
-	{ 0x3be0, 0x0000, 0x3be0 },
-	{ 0x2960, 0x0000, 0x0000 },
-	{ 0x0000, 0x0000, 0x0000 }
-};
 
 VIDEO_UPDATE( multi32 )
 {
@@ -2725,7 +2604,6 @@ VIDEO_UPDATE( multi32 )
 	struct rectangle clipleft, clipright;
 	UINT8 enablemask;
 	int res;
-	int restore = system32_videoram[0x1ff02/2], remix = -1;
 
 	/* configure monitors */
 	int monitor_setting = readinputport(0xf);
@@ -2749,41 +2627,8 @@ VIDEO_UPDATE( multi32 )
 		return;
 	}
 
-	if (titlef_kludge) /* force background to render */
-	{
-		int i;
-		for (i=0; titlef_mixer[i][0]!=0; i++)
-			if (system32_videoram[0x1ff02/2] == titlef_mixer[i][0])
-			{
-				system32_videoram[0x1ff02/2] = titlef_mixer[i][1];
-				if (titlef_mixer[i][1] != titlef_mixer[i][2])
-					remix = titlef_mixer[i][2];
-				break;
-			}
-
-		{ /* patch ending credits */
-			UINT16 *src1 = get_layer_scanline(MIXER_LAYER_NBG0, 0);
-			UINT16 *src2 = get_layer_scanline(MIXER_LAYER_NBG1, 0);
-			if (src1[0]==0x1902 && src1[8]==0x1901 && src1[16]==0x1902 && src1[24]==0x1901)
-				system32_videoram[0x1ff8e/2] = 0x8;
-
-			if (src2[0]==0x1902 && src2[8]==0x1901 && src2[16]==0x1902 && src2[24]==0x1901)
-				system32_videoram[0x1ff8e/2] = (system32_videoram[0x1ff8e/2]==0x8) ? 0x18 : 0x10;
-		}
-	}
-
 	/* update the tilemaps */
 	enablemask = update_tilemaps(&clipleft);
-
-	/* debugging */
-#if QWERTY_LAYER_ENABLE
-	if (code_pressed(KEYCODE_Q)) enablemask = 0x01;
-	if (code_pressed(KEYCODE_W)) enablemask = 0x02;
-	if (code_pressed(KEYCODE_E)) enablemask = 0x04;
-	if (code_pressed(KEYCODE_R)) enablemask = 0x08;
-	if (code_pressed(KEYCODE_T)) enablemask = 0x10;
-	if (code_pressed(KEYCODE_Y)) enablemask = 0x20;
-#endif
 
 	/* do the mixing */
 	if (system32_displayenable[0] && monitor_setting != 2) /* speed up - disable offscreen monitor */
@@ -2791,40 +2636,10 @@ VIDEO_UPDATE( multi32 )
 	else
 		fillbitmap(bitmap, get_black_pen(), &clipleft);
 
-	if (remix != -1)
-	{
-		system32_videoram[0x1ff02/2] = remix;
-		enablemask = update_tilemaps(&clipleft);
-	}
-	if (system32_videoram[0x1ff02/2] != restore)
-		system32_videoram[0x1ff02/2] = restore;
-
 	if (system32_displayenable[1] && monitor_setting != 1) /* speed up - disable offscreen monitor */
 		mix_all_layers(1, clipright.min_x, bitmap, &clipleft, enablemask);
 	else
 		fillbitmap(bitmap, get_black_pen(), &clipright);
-
-	if (!code_pressed(KEYCODE_M)) print_mixer_data(0);
-	else print_mixer_data(1);
-#if LOG_SPRITES
-{
-	if (code_pressed(KEYCODE_L))
-	{
-		FILE *f = fopen("sprite.txt", "w");
-		int x, y;
-
-		for (y = clipleft.min_y; y <= clipleft.max_y; y++)
-		{
-			UINT16 *src = get_layer_scanline(MIXER_LAYER_SPRITES, y);
-			for (x = clipleft.min_x; x <= clipleft.max_x; x++)
-				fprintf(f, "%04X ", *src++);
-			fprintf(f, "\n");
-		}
-		fclose(f);
-	}
-}
-#endif
-
 }
 
 
