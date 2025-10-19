@@ -3257,6 +3257,8 @@ BOMULEUL CHAJARA SEGA ST-V  1997/04/11
 	/* Genie Hardware (uses Genesis VDP) also has 'Sun Mixing Co' put into tile ram */
 	DRIVER( puckpkmn )	/* (c) 2000 Genie */
 	DRIVER( jzth )		/* (c) 2000 <unknown> */
+  DRIVER( songjang )  /* (c) 2000 WAH LAB */
+  DRIVER( shuifeng )  /* (c) 1999 WAH LAB */
 	DRIVER( sbubsm )	/* (c) 1996 Sun Mixing */
   DRIVER( barek3mb ) /* (c) 1994 bootleg / Sega */
   DRIVER( aladmdb ) /*  (c) 1993 bootleg / Sega */
@@ -5158,6 +5160,7 @@ BOMULEUL CHAJARA SEGA ST-V  1997/04/11
 	DRIVER( glass )		/* (c) 1993 - Ref 931021 */
 	DRIVER( glasskr )	/* (c) 1994 - Ref 931021 Anime girls, unprotected */
 	DRIVER( targeth )	/* (c) 1994 - Ref 940531 */
+	DRIVER( quickshts )	/* (c) 1994 - Ref 940531 */
 	DRIVER( thoop2 )	/* (c) 1994 - Ref ??? */
 	DRIVER( aligator )	/* (c) 1994 - Ref 940411 */
 	DRIVER( aligatun )	/* (c) 1994 - Ref 940411 (unprotected) */
@@ -5637,6 +5640,7 @@ Other Sun games
   DRIVER( puzzli2 )   /* (c) 1999 */
   DRIVER( puzzli2s )  /* (c) 2001 */
   DRIVER( py2k2 )     /* (c) 2001 */
+  DRIVER( ddp2 )      /* (c) 2001 */
 
 	/* RamTek games */
 	DRIVER( hitme )		/* [1976 Ramtek] */
