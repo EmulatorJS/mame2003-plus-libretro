@@ -116,6 +116,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Inca * Mature *
 * Indian Battle
 * Invasion
+* Jammin (Atari Prototype)
 * Joe & Mac Returns
 * Jolly Jogger
 * Jurassic Park (Bootleg Of Megadrive Version)
@@ -190,6 +191,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Rumba Lumber
 * Samurai Shodown V
 * Samurai Shodown V Special
+* Saurian Front (Williams Prototype)
 * SD Fighters
 * Sega Megaplay : Bio Hazard Battle
 * Sega Megaplay : Columns III
@@ -199,6 +201,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Sega Megaplay : Tecmo World Cup
 * Sega Sonic Bros (Japan, Prototype)
 * Sengoku 3
+* Shuihu Feng Yun Zhuan
 * Skater (Deco Cassette)
 * Skull Fang
 * Slap Shooter
@@ -350,6 +353,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Donkey Kong Remix
 * Donkey Kong Christmas Remix
 * Dottori-Man Jr. (Hack by Chris Covell)
+* Double Dragon One (Beta 7)
 * DownTown (joystick hack)
 * Final Fight 30th Anniversary Edition (Grego And Rotwang)
 * Food Fight - Live Center Rev 5 w/ debounce delay position hack
@@ -359,6 +363,7 @@ The list of direct contributors to the MAME 2003-Plus github repository can be f
 * Midnight Resistance (joystick hack bootleg)
 * Mortal Kombat 2 Plus Beta 2
 * TANK III (joystick hack bootleg)
+* The Eye Of The Typhoon (Beta 7)
 * Tron freeplay custom rom
 * Ultimate Mortal Kombat 3 Plus Beta 2
 
@@ -1146,3 +1151,9 @@ could crash on the score calc between levels is sorted [amadvance, arcadez]
 * Added Taito's Victorious Nine to flstory.c and hooked up the M68705 protection MCU for Taito's Field Day [arcadez]
 * Added support for Gladmort to the NeoGeo driver [arcadez]
 * Added Quick Shots an unprotected version of Target Hits to the targeth.c driver then updated the gfx and configured the gun sights [arcadez, grant2258]
+* Added Shuihu Feng Yun Zhuan and Songjiangyanyi Final to the segac2.c driver grant2258 fixed Shuihu Feng Yun Zhuan game now playable [grant2258, arcadez]
+* Supported Double Dragon One and The Eve Of The Typhoon in neogeo.c [arcadez]
+* Added Double Wings (Asia) to the dblewing.c driver as unlike the original version this one doen't have checkpoints [arcadez]
+* Ported across from FBL dink's fix for the broken text gfx layer in the Japanese version Of Cameltry [dink, arcadez]
+* Added support for Jammin a rare Atari prototype music game to the Donkey Kong driver [arcadez]
+* Added Saurian Front a super rare Williams prototype of Midway's Strike Force to the midyunit driver [arcadez]

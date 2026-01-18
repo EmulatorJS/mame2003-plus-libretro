@@ -857,6 +857,7 @@ const struct GameDriver *test_drivers[] =
 	DRIVER( spnchout )	/* (c) 1984 */
 	DRIVER( spnchotj )	/* (c) 1984 (Japan) */
 	DRIVER( armwrest )	/* (c) 1985 */
+  DRIVER( jammin )	  /* (c) 1985 Atari Prototype */
 
 	/* Nintendo Playchoice 10 games */
 	DRIVER( pc_tenis )	/* (c) 1983 Nintendo */
@@ -3586,7 +3587,8 @@ BOMULEUL CHAJARA SEGA ST-V  1997/04/11
 	DRIVER( boogwinga )	/* MBD (c) 1993 Data East Corporation (Asia) */
 	DRIVER( ragtime )	/* MBD (c) 1993 Data East Corporation (Japan)*/
 	DRIVER( ragtimea )	/* MBD (c) 1993 Data East Corporation (Japan)*/
-	DRIVER( dblewing )      /* MBE (c) 1993 Mitchell */
+	DRIVER( dblewing )       /* MBE (c) 1993 Mitchell */
+  DRIVER( dblewingb )      /* MBE (c) 1994 Mitchell */
 	DRIVER( fghthist )	/* MBF (c) 1993 Data East Corporation (World) */
 	DRIVER( fghthistu )	/* MBF (c) 1993 Data East Corporation (US) */
 	DRIVER( fghthista )	/* MBF (c) 1993 Data East Corporation (US) */
@@ -4750,6 +4752,7 @@ BOMULEUL CHAJARA SEGA ST-V  1997/04/11
 	DRIVER( shimpact )	/* (c) 1991 Midway */
 	DRIVER( shimpacp )	/* (c) 1991 Midway */
 	DRIVER( strkforc )	/* (c) 1991 Midway */
+	DRIVER( saurnfrnt )	/* (c) 1991 Williams */
 	DRIVER( mk )		/* (c) 1992 Midway */
 	DRIVER( mkr4 )		/* (c) 1992 Midway */
 	DRIVER( mkprot9 )	/* (c) 1992 Midway */
@@ -6090,10 +6093,17 @@ Other Sun games
   DRIVER( knightsch )     /* (c) 2014 Neobitz */
 	DRIVER( xeno )          /* (c) 2019 Bitmap Bureau */
 	DRIVER( hypernoid )     /* 2021 M.Priewe */
+  DRIVER( teot)           /* 2022 Ozzy Ouzo */
 	DRIVER( cyborgforce )   /* (c) 2023 Neo Byte Force Ltd */
 	DRIVER( captainbarrel ) /* (c) 2024 Neo Byte Force Ltd */
   DRIVER( gladmort )      /* (c) 2024 Pixelheart / ChipsOnSteroids */
-
+  DRIVER( doubled1 )      /* (c) 2025 La Casa De Ruivo / Neo Byte Force */
+  DRIVER( doubled1a )      /* (c) 2025 La Casa De Ruivo / Neo Byte Force */
+  DRIVER( doubled1b )      /* (c) 2025 La Casa De Ruivo / Neo Byte Force */
+  DRIVER( doubled1c )      /* (c) 2025 La Casa De Ruivo / Neo Byte Force */
+  DRIVER( doubled1d )      /* (c) 2025 La Casa De Ruivo / Neo Byte Force */
+  DRIVER( doubled1e )      /* (c) 2025 La Casa De Ruivo / Neo Byte Force */
+	
 	/* SemiCom 68020 based hardware */
 	DRIVER( baryon )    /* (c) 1997 SemiCom / Tirano */
 	DRIVER( cutefght )  /* (c) 1998 SemiCom */
